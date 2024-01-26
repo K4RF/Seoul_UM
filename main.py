@@ -1,6 +1,7 @@
 import discord
+import asyncio
 from discord.ext import commands
-from config.py import TOKEN, TARGET_USERS, TARGET_WORDS
+from config import TOKEN, TARGET_USERS, TARGET_WORDS
 from datetime import datetime, timedelta
 
 intents = discord.Intents.default()
@@ -11,49 +12,49 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# 사용자별 마지막 삭제 시간을 저장할 딕셔너리
-last_deletion_time = {}
+# 사용자별 처음 삭제 시간을 저장할 딕셔너리
+first_deletion_time = {}
 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
+
+async def send_delayed_message(author, content):
+    await asyncio.sleep(60 * 60)  # 60분
+    await author.send(content)
 
 @bot.event
 async def on_message(message):
     if message.author.id in TARGET_USERS:
         current_time = datetime.utcnow()
 
-        # 사용자가 마지막으로 메시지를 삭제한 시간
-        last_time = last_deletion_time.get(message.author.id)
+        # 사용자가 처음으로 메시지를 삭제한 시간
+        first_time = first_deletion_time.get(message.author.id)
 
-        # 금지어가 포함된 경우 항상 삭제
+        # 금지어가 포함된 경우만 처리
         for target_word in TARGET_WORDS:
             if target_word.lower() in message.content.lower():
-                await message.delete()
-                await message.channel.send(f'{message.author.mention}, 메시지에 포함된 단어로 인해 메시지가 삭제되었습니다.')
-                
-                # 현재 시간으로 업데이트
-                last_deletion_time[message.author.id] = current_time
-                return  # 메시지에 금지어가 포함되었을 경우 뒤의 코드 실행하지 않도록
+                try:
+                    await message.delete()
+                except discord.errors.NotFound:
+                    pass  # 메시지가 이미 삭제된 경우 무시
 
-        # 멘션된 사용자 목록 확인
-        mentioned_users = [mention.id for mention in message.mentions]
-        if any(user_id in TARGET_USERS for user_id in mentioned_users):
-            if last_time is None or (current_time - last_time) > timedelta(minutes=5):
-                await message.delete()
-                await message.channel.send(f'{message.author.mention}, 멘션된 사용자가 금지어를 포함한 메시지를 보냈습니다.')
-                
-                # 현재 시간으로 업데이트
-                last_deletion_time[message.author.id] = current_time
+                if first_time is None:
+                    try:
+                        await message.channel.send(f'{message.author.mention}, 메시지에 포함된 단어로 인해 메시지가 삭제되었습니다. '
+                                                   f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.')
+                    except discord.errors.NotFound:
+                        pass  # 채널이 이미 삭제된 경우 무시
 
-        # 사용자 이름에 금지어가 포함된 경우
-        if any(target_word.lower() in message.author.name.lower() for target_word in TARGET_WORDS):
-            if last_time is None or (current_time - last_time) > timedelta(minutes=5):
-                await message.delete()
-                await message.channel.send(f'{message.author.mention}, 사용자 이름에 금지어가 포함된 메시지를 보냈습니다.')
-                
-                # 현재 시간으로 업데이트
-                last_deletion_time[message.author.id] = current_time
+                    # 현재 시간으로 업데이트
+                    first_deletion_time[message.author.id] = current_time
+
+                    # 최초 삭제 시에만 사용자에게 다시 메시지 보내기
+                    delayed_message = f'{message.author.mention}, 이 메시지는 금지어가 포함되어 삭제되었습니다. ' \
+                                      f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.'
+                    bot.loop.create_task(send_delayed_message(message.author, delayed_message))
+
+                return  # 다음 동작을 방지하기 위해 리턴
 
     await bot.process_commands(message)
 
