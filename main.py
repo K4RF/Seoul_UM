@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-TOKEN = 'MTE5OTk0OTA0Mzk2Nzc0MTk4Mg.GTKRYq.w0BAj4QsJ_WkTTr-0jogg3vOsGk-06nSbSXb5E'
+TOKEN = 'Bot_Token'
 TARGET_USERS = [404558066005180416, 712140650866540585, 383529679551725568, 346563993328025602, 292579015531692032, 864475917685096458]  # 삭제 대상 사용자들의 Discord ID 입력
 TARGET_WORDS = ['엄', 'UM', 'úm']  # 삭제하고 싶은 단어나 문구 입력
 
