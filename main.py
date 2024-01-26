@@ -1,5 +1,4 @@
 import discord
-import asyncio
 from discord.ext import commands
 from config import TOKEN, TARGET_USERS, TARGET_WORDS
 from datetime import datetime, timedelta
@@ -21,7 +20,10 @@ async def on_ready():
 
 async def send_delayed_message(author, content):
     await asyncio.sleep(60 * 60)  # 60분
-    await author.send(content)
+    try:
+        await author.send(content)
+    except discord.errors.Forbidden:
+        pass  # DM이 차단되어 있는 경우 무시
 
 @bot.event
 async def on_message(message):
