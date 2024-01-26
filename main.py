@@ -1,4 +1,5 @@
 import discord
+import asyncio
 from discord.ext import commands
 from config import TOKEN, TARGET_USERS, TARGET_WORDS
 from datetime import datetime, timedelta
