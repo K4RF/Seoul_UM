@@ -72,4 +72,11 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
+@bot.event
+async def on_message_delete(message):
+    # 지연 삭제 중에 봇이 보낸 삭제 메시지가 삭제되면 해당 멤버의 정보를 초기화
+    member = message.guild.get_member(message.author.id)
+    if member and member in first_deletion_data:
+        del first_deletion_data[member]
+
 bot.run(TOKEN)
