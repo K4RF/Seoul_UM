@@ -42,6 +42,11 @@ async def on_message(message):
                     await message.delete()
                 except discord.errors.NotFound:
                     pass  # 메시지가 이미 삭제된 경우 무시
+                except discord.errors.HTTPException as e:
+                    if e.status == 429:
+                        # Rate Limit이 발생한 경우, 5초 대기 후 다시 시도
+                        await asyncio.sleep(5)
+                        await message.delete()
 
                 if first_time is None:
                     try:
