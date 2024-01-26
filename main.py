@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from config import TOKEN, TARGET_USERS, TARGET_WORDS
+from config.py import TOKEN, TARGET_USERS, TARGET_WORDS
 from datetime import datetime, timedelta
 
 intents = discord.Intents.default()
