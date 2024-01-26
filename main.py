@@ -12,8 +12,8 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# 멤버별 처음 삭제 시간을 저장할 딕셔너리
-first_deletion_time = {}
+# 멤버별 최초 삭제 시간 및 보낸 여부를 저장할 딕셔너리
+first_deletion_data = {}
 
 @bot.event
 async def on_ready():
@@ -31,9 +31,9 @@ async def on_message(message):
     if message.author.id in TARGET_USERS:
         current_time = datetime.utcnow()
 
-        # 멤버가 처음으로 메시지를 삭제한 시간
+        # 멤버의 최초 삭제 시간 및 보낸 여부
         member = message.guild.get_member(message.author.id)
-        first_time = first_deletion_time.get(member)
+        deletion_data = first_deletion_data.get(member, {'time': None, 'sent': False})
 
         # 금지어가 포함된 경우만 처리
         for target_word in TARGET_WORDS:
@@ -53,15 +53,15 @@ async def on_message(message):
                         except discord.errors.NotFound:
                             pass  # 메시지가 이미 삭제된 경우 무시
 
-                if first_time is None:
+                if deletion_data['time'] is None:
                     try:
                         await message.channel.send(f'{message.author.mention}, 메시지에 포함된 단어로 인해 메시지가 삭제되었습니다. '
                                                    f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.')
                     except discord.errors.NotFound:
                         pass  # 채널이 이미 삭제된 경우 무시
 
-                    # 현재 시간으로 업데이트
-                    first_deletion_time[member] = current_time
+                    # 현재 시간으로 업데이트 및 보낸 여부 표시
+                    first_deletion_data[member] = {'time': current_time, 'sent': True}
 
                     # 최초 삭제 시에만 멤버에게 다시 메시지 보내기
                     delayed_message = f'{message.author.mention}, 이 메시지는 금지어가 포함되어 삭제되었습니다. ' \
