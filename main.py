@@ -1,8 +1,8 @@
 import discord
-import asyncio
 from discord.ext import commands
 from config import TOKEN, TARGET_USERS, TARGET_WORDS
 from datetime import datetime, timedelta
+import asyncio
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -39,14 +39,19 @@ async def on_message(message):
         for target_word in TARGET_WORDS:
             if target_word.lower() in message.content.lower():
                 try:
-                    await message.delete()
+                    # 메시지가 존재하는지 확인 후 삭제 시도
+                    fetched_message = await message.channel.fetch_message(message.id)
+                    await fetched_message.delete()
                 except discord.errors.NotFound:
                     pass  # 메시지가 이미 삭제된 경우 무시
                 except discord.errors.HTTPException as e:
                     if e.status == 429:
                         # Rate Limit이 발생한 경우, 5초 대기 후 다시 시도
                         await asyncio.sleep(5)
-                        await message.delete()
+                        try:
+                            await fetched_message.delete()
+                        except discord.errors.NotFound:
+                            pass  # 메시지가 이미 삭제된 경우 무시
 
                 if first_time is None:
                     try:
