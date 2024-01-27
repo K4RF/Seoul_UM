@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from config import TOKEN, TARGET_USERS, TARGET_WORDS, target_channel_id
+from config import TOKEN, TARGET_USERS, TARGET_WORDS, EXCEPTION_WORDS, target_channel_id
 from datetime import datetime, timedelta
 import asyncio
 
@@ -32,13 +32,6 @@ async def send_delayed_message(member, content):
         pass  # DM이 차단되어 있는 경우 무시
 
 @bot.event
-async def on_disconnect():
-    # 봇이 꺼질 때 메시지를 특정 채널에 보냅니다.
-    target_channel = bot.get_channel(target_channel_id)
-    if target_channel:
-        await target_channel.send(f'계엄령이 해제되었습니다.')
-
-@bot.event
 async def on_shutdown():
     # 봇이 종료될 때 메시지를 특정 채널에 보냅니다.
     target_channel = bot.get_channel(target_channel_id)
@@ -57,6 +50,10 @@ async def on_message(message):
         # 금지어가 포함된 경우만 처리
         for target_word in TARGET_WORDS:
             if target_word.lower() in message.content.lower():
+                # 예외 단어가 포함된 경우 처리하지 않음
+                if any(exception_word.lower() in message.content.lower() for exception_word in EXCEPTION_WORDS):
+                    return
+
                 try:
                     # 메시지가 존재하는지 확인 후 삭제 시도
                     fetched_message = await message.channel.fetch_message(message.id)
@@ -74,7 +71,7 @@ async def on_message(message):
 
                 if first_time is None:
                     try:
-                        await message.channel.send(f'{message.author.mention}, 메시지에 포함된 단어로 인해 메시지가 삭제되었습니다. '
+                        await message.channel.send(f'{message.author.mention}, 메시지에 그 단어가 포함돼 메시지가 삭제되었습니다. '
                                                    f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.')
                     except discord.errors.NotFound:
                         pass  # 채널이 이미 삭제된 경우 무시
@@ -83,7 +80,7 @@ async def on_message(message):
                     first_deletion_time[member] = current_time
 
                     # 최초 삭제 시에만 멤버에게 다시 메시지 보내기
-                    delayed_message = f'{message.author.mention}, 이 메시지는 금지어가 포함되어 삭제되었습니다. ' \
+                    delayed_message = f'{message.author.mention}, 이 메시지는 그 단어가 포함되어 삭제되었습니다. ' \
                                       f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.'
                     bot.loop.create_task(send_delayed_message(member, delayed_message))
 
