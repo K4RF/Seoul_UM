@@ -3,6 +3,8 @@ from discord.ext import commands
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, target_channel_id, ALLOWED_USERS
 from datetime import datetime, timedelta
 import asyncio
+import os
+import sys
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -19,6 +21,9 @@ target_users = set(TARGET_USERS)
 
 # 멤버별 처음 삭제 시간을 저장할 딕셔너리
 first_deletion_time = {}
+
+# 봇의 삭제 기능 활성/비활성 상태를 나타내는 변수
+delete_enabled = True
 
 # Define a decorator to check if the command invoker is allowed
 def is_allowed(ctx):
@@ -49,7 +54,9 @@ async def on_shutdown():
 
 @bot.event
 async def on_message(message):
-    if message.author.id in target_users:
+    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
+
+    if message.author.id in target_users and delete_enabled:
         current_time = datetime.utcnow()
 
         # 멤버가 처음으로 메시지를 삭제한 시간
@@ -157,7 +164,32 @@ async def list_users(ctx):
 @bot.command(name='shutdown')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def shutdown(ctx):
+    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
+    delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
     await ctx.send('계엄령이 해제되었습니다.')
-    await bot.logout()  # 수정된 부분
+    await bot.close()
 
+@bot.command(name='logout')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def logout(ctx):
+    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
+    delete_enabled = False  # 로그아웃 시 삭제 기능 비활성화
+    await ctx.send('계엄령이 임시 해제되었습니다')
+    await bot.change_presence(status=discord.Status.idle)
+
+@bot.command(name='restart')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def restart(ctx):
+    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
+    delete_enabled = True  # 재시작 시 삭제 기능 다시 활성화
+    await ctx.send('계엄령을 재선포합니다.')
+    
+    # 봇을 다시 활성화하는 코드 추가
+    await bot.change_presence(status=discord.Status.online)
+
+    # 봇을 재시작하기 위해 현재 실행 중인 파이썬 프로세스를 다시 시작
+    python = sys.executable
+    os.execl(python, python, *sys.argv)
+
+# 봇을 실행
 bot.run(TOKEN)
