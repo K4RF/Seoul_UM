@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_NAME, target_channel_id, ALLOWED_USERS
+from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
 from datetime import datetime, timedelta
 import asyncio
 
@@ -73,7 +73,8 @@ async def on_message(message):
         for target_word in banned_words:
             if (
                 target_word.lower() in message.content.lower()
-                or find_role(message.guild, TARGET_ROLE_NAME) in message.role_mentions
+                or any(user.id in [mention.id for mention in message.mentions] for user in message.guild.members)
+                or any(role.id in TARGET_ROLE_IDS for role in message.role_mentions)
             ):
                 # 예외 단어가 포함된 경우 처리하지 않음
                 if any(exception_word.lower() in message.content.lower() for exception_word in exception_words):
