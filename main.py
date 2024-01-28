@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, target_channel_id
+from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, target_channel_id, ALLOWED_USERS
 from datetime import datetime, timedelta
 import asyncio
 
@@ -19,6 +19,10 @@ target_users = set(TARGET_USERS)
 
 # 멤버별 처음 삭제 시간을 저장할 딕셔너리
 first_deletion_time = {}
+
+# Define a decorator to check if the command invoker is allowed
+def is_allowed(ctx):
+    return ctx.author.id in ALLOWED_USERS
 
 @bot.event
 async def on_ready():
@@ -99,46 +103,61 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-@bot.command(name='add_banned_word')
-async def add_banned_word(ctx, word):
+@bot.command(name='add_word')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def add_word(ctx, word):
     banned_words.add(word.lower())
     await ctx.send(f'The word "{word}" has been added to the list of banned words.')
 
-@bot.command(name='remove_banned_word')
-async def remove_banned_word(ctx, word):
+@bot.command(name='remove_word')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def remove_word(ctx, word):
     banned_words.discard(word.lower())
     await ctx.send(f'The word "{word}" has been removed from the list of banned words.')
 
-@bot.command(name='list_banned_words')
-async def list_banned_words(ctx):
+@bot.command(name='list_words')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def list_words(ctx):
     await ctx.send(f'Banned words: {", ".join(banned_words)}')
 
-@bot.command(name='add_exception_word')
-async def add_exception_word(ctx, word):
+@bot.command(name='add_exception')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def add_exception(ctx, word):
     exception_words.add(word.lower())
     await ctx.send(f'The exception word "{word}" has been added.')
 
-@bot.command(name='remove_exception_word')
-async def remove_exception_word(ctx, word):
+@bot.command(name='remove_exception')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def remove_exception(ctx, word):
     exception_words.discard(word.lower())
     await ctx.send(f'The exception word "{word}" has been removed.')
 
-@bot.command(name='list_exception_words')
-async def list_exception_words(ctx):
+@bot.command(name='list_exception')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def list_exception(ctx):
     await ctx.send(f'Exception words: {", ".join(exception_words)}')
 
-@bot.command(name='add_target_user')
-async def add_target_user(ctx, user_id: int):
+@bot.command(name='add_user')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def add_user(ctx, user_id: int):
     target_users.add(user_id)
     await ctx.send(f'The user with ID {user_id} has been added to the list of targeted users.')
 
-@bot.command(name='remove_target_user')
-async def remove_target_user(ctx, user_id: int):
+@bot.command(name='remove_user')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def remove_user(ctx, user_id: int):
     target_users.discard(user_id)
     await ctx.send(f'The user with ID {user_id} has been removed from the list of targeted users.')
 
-@bot.command(name='list_target_users')
-async def list_target_users(ctx):
+@bot.command(name='list_users')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def list_users(ctx):
     await ctx.send(f'Targeted users: {", ".join(str(user_id) for user_id in target_users)}')
+
+@bot.command(name='shutdown')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def shutdown(ctx):
+    await ctx.send('계엄령이 해제되었습니다.')
+    await bot.logout()  # 수정된 부분
 
 bot.run(TOKEN)
