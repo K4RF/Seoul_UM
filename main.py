@@ -3,8 +3,6 @@ from discord.ext import commands
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, target_channel_id, ALLOWED_USERS
 from datetime import datetime, timedelta
 import asyncio
-import os
-import sys
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -182,14 +180,12 @@ async def logout(ctx):
 async def restart(ctx):
     global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
     delete_enabled = True  # 재시작 시 삭제 기능 다시 활성화
-    await ctx.send('계엄령을 재선포합니다.')
     
     # 봇을 다시 활성화하는 코드 추가
     await bot.change_presence(status=discord.Status.online)
+    await ctx.send('계엄령을 재선포합니다.')
 
     # 봇을 재시작하기 위해 현재 실행 중인 파이썬 프로세스를 다시 시작
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
 
 # 봇을 실행
 bot.run(TOKEN)
