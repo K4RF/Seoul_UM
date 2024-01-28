@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, target_channel_id, ALLOWED_USERS
+from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_NAME, target_channel_id, ALLOWED_USERS
 from datetime import datetime, timedelta
 import asyncio
 
@@ -22,6 +22,14 @@ first_deletion_time = {}
 
 # 봇의 삭제 기능 활성/비활성 상태를 나타내는 변수
 delete_enabled = True
+
+# 로그아웃 및 재시작 여부를 나타내는 변수
+logout_done = False
+restart_done = False
+
+# 역할 이름을 기반으로 역할을 찾는 함수
+def find_role(guild, role_name):
+    return discord.utils.get(guild.roles, name=role_name)
 
 # Define a decorator to check if the command invoker is allowed
 def is_allowed(ctx):
@@ -63,7 +71,10 @@ async def on_message(message):
 
         # 금지어가 포함된 경우만 처리
         for target_word in banned_words:
-            if target_word.lower() in message.content.lower():
+            if (
+                target_word.lower() in message.content.lower()
+                or find_role(message.guild, TARGET_ROLE_NAME) in message.role_mentions
+            ):
                 # 예외 단어가 포함된 경우 처리하지 않음
                 if any(exception_word.lower() in message.content.lower() for exception_word in exception_words):
                     return
@@ -91,8 +102,10 @@ async def on_message(message):
 
                     if first_time is None:
                         try:
-                            await message.channel.send(f'{message.author.mention}, 메시지에 그 단어가 포함돼 메시지가 삭제되었습니다. '
-                                                       f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.')
+                            await message.channel.send(
+                                f'{message.author.mention}, 메시지에 그 단어가 포함돼 메시지가 삭제되었습니다. '
+                                f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.'
+                            )
                         except discord.errors.NotFound:
                             pass  # 채널이 이미 삭제된 경우 무시
 
@@ -162,30 +175,40 @@ async def list_users(ctx):
 @bot.command(name='shutdown')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def shutdown(ctx):
-    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
-    delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
-    await ctx.send('계엄령이 해제되었습니다.')
-    await bot.close()
+    global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+    if not logout_done and not restart_done:
+        delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
+        logout_done = True  # 로그아웃이 수행됨을 표시
+        await ctx.send('계엄령이 해제되었습니다.')
+        await bot.close()
+    else:
+        await ctx.send('이미 로그아웃 또는 재시작이 수행되었습니다.')
 
 @bot.command(name='logout')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def logout(ctx):
-    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
-    delete_enabled = False  # 로그아웃 시 삭제 기능 비활성화
-    await ctx.send('계엄령이 임시 해제되었습니다')
-    await bot.change_presence(status=discord.Status.idle)
+    global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+    if not logout_done and not restart_done:
+        delete_enabled = False  # 로그아웃 시 삭제 기능 비활성화
+        logout_done = True  # 로그아웃이 수행됨을 표시
+        await ctx.send('계엄령이 임시 해제되었습니다')
+        await bot.change_presence(status=discord.Status.idle)
+    else:
+        await ctx.send('이미 로그아웃 또는 재시작이 수행되었습니다.')
 
 @bot.command(name='restart')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def restart(ctx):
-    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
-    delete_enabled = True  # 재시작 시 삭제 기능 다시 활성화
-    
-    # 봇을 다시 활성화하는 코드 추가
-    await bot.change_presence(status=discord.Status.online)
-    await ctx.send('계엄령을 재선포합니다.')
+    global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+    if not logout_done and not restart_done:
+        delete_enabled = True  # 재시작 시 삭제 기능 다시 활성화
+        restart_done = True  # 재시작이 수행됨을 표시
 
-    # 봇을 재시작하기 위해 현재 실행 중인 파이썬 프로세스를 다시 시작
+        # 봇을 다시 활성화하는 코드 추가
+        await bot.change_presence(status=discord.Status.online)
+        await ctx.send('계엄령을 재선포합니다.')
+    else:
+        await ctx.send('이미 로그아웃 또는 재시작이 수행되었습니다.')
 
 # 봇을 실행
 bot.run(TOKEN)
