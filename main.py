@@ -91,8 +91,8 @@ async def on_message(message):
                     pass  # 메시지가 이미 삭제된 경우 무시
                 except discord.errors.HTTPException as e:
                     if e.status == 429:
-                        # Rate Limit이 발생한 경우, 5초 대기 후 다시 시도
-                        await asyncio.sleep(5)
+                        # Rate Limit이 발생한 경우, 1초 대기 후 다시 시도
+                        await asyncio.sleep(1)  # 1초
                         try:
                             fetched_message = await message.channel.fetch_message(message.id)
                         except discord.errors.NotFound:
