@@ -35,6 +35,9 @@ def find_role(guild, role_name):
 def is_allowed(ctx):
     return ctx.author.id in ALLOWED_USERS
 
+# Dictionary to store whether the first error message has been sent for each member
+first_error_message_sent = {}
+
 @bot.event
 async def on_ready():
     print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
@@ -165,8 +168,17 @@ async def add_user(ctx, user_id: int):
 @bot.command(name='remove_user')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_user(ctx, user_id: int):
-    target_users.discard(user_id)
-    await ctx.send(f'The user with ID {user_id} has been removed from the list of targeted users.')
+    try:
+        target_users.remove(user_id)
+        await ctx.send(f'The user with ID {user_id} has been removed from the list of targeted users.')
+        # Check if the first error message has been sent for this member
+        if first_error_message_sent.get(ctx.author.id) is None:
+            # Set the flag to True
+            first_error_message_sent[ctx.author.id] = True
+            # Send the error message
+            await ctx.send("You don't have the permission to execute this command.")
+    except ValueError:
+        await ctx.send(f'The user with ID {user_id} was not in the list of targeted users.')
 
 @bot.command(name='list_users')
 @commands.check(is_allowed)  # Check if the invoker is allowed
@@ -177,39 +189,51 @@ async def list_users(ctx):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def shutdown(ctx):
     global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
-    if not logout_done and not restart_done:
-        delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
-        logout_done = True  # 로그아웃이 수행됨을 표시
-        await ctx.send('계엄령이 해제되었습니다.')
-        await bot.close()
-    else:
-        await ctx.send('이미 로그아웃 또는 재시작이 수행되었습니다.')
+    delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
+    logout_done = True  # 로그아웃이 수행됨을 표시
+    restart_done = True
+    await ctx.send('계엄령이 해제되었습니다.')
+    await bot.close()
 
 @bot.command(name='logout')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def logout(ctx):
     global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
-    if not logout_done and not restart_done:
+    if not logout_done:
         delete_enabled = False  # 로그아웃 시 삭제 기능 비활성화
         logout_done = True  # 로그아웃이 수행됨을 표시
+        restart_done = False
         await ctx.send('계엄령이 임시 해제되었습니다')
         await bot.change_presence(status=discord.Status.idle)
     else:
-        await ctx.send('이미 로그아웃 또는 재시작이 수행되었습니다.')
+        await ctx.send('이미 로그아웃이 수행되었습니다.')
 
 @bot.command(name='restart')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def restart(ctx):
     global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
-    if not logout_done and not restart_done:
+    if not restart_done:
         delete_enabled = True  # 재시작 시 삭제 기능 다시 활성화
         restart_done = True  # 재시작이 수행됨을 표시
+        logout_done = False
 
         # 봇을 다시 활성화하는 코드 추가
         await bot.change_presence(status=discord.Status.online)
         await ctx.send('계엄령을 재선포합니다.')
     else:
-        await ctx.send('이미 로그아웃 또는 재시작이 수행되었습니다.')
+        await ctx.send('이미 재시작이 수행되었습니다.')
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        # Check if the first error message has been sent for this member
+        if first_error_message_sent.get(ctx.author.id) is None:
+            # Set the flag to True
+            first_error_message_sent[ctx.author.id] = True
+            # Send the error message
+            await ctx.send("님 권한 없음 ㅅㄱ")
+    else:
+        raise error
 
 # 봇을 실행
 bot.run(TOKEN)
