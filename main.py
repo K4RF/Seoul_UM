@@ -107,8 +107,8 @@ async def on_message(message):
                     if first_time is None:
                         try:
                             await message.channel.send(
-                                f'{message.author.mention}, 메시지에 그 단어가 포함돼 메시지가 삭제되었습니다. '
-                                f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.'
+                                f'{message.author.mention}, 그 단어 쓰지 말라 했제. '
+                                f'이번만 알려준다'
                             )
                         except discord.errors.NotFound:
                             pass  # 채널이 이미 삭제된 경우 무시
@@ -117,8 +117,8 @@ async def on_message(message):
                         first_deletion_time[member] = current_time
 
                         # 최초 삭제 시에만 멤버에게 다시 메시지 보내기
-                        delayed_message = f'{message.author.mention}, 이 메시지는 그 단어가 포함되어 삭제되었습니다. ' \
-                                          f'최초 삭제 시에만 봇이 이 메시지를 보냅니다.'
+                        delayed_message = f'{message.author.mention}, 그 단어 쓰지 말라 했제. ' \
+                                          f'이번만 알려준다'
                         bot.loop.create_task(send_delayed_message(member, delayed_message))
 
                 return  # 다음 동작을 방지하기 위해 리턴
@@ -129,13 +129,13 @@ async def on_message(message):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_word(ctx, word):
     banned_words.add(word.lower())
-    await ctx.send(f'The word "{word}" has been added to the list of banned words.')
+    await ctx.send(f'이제 님들 "{word}"도 못 씀')
 
 @bot.command(name='remove_word')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_word(ctx, word):
     banned_words.discard(word.lower())
-    await ctx.send(f'The word "{word}" has been removed from the list of banned words.')
+    await ctx.send(f'"{word}"은 쓰십쇼')
 
 @bot.command(name='list_words')
 @commands.check(is_allowed)  # Check if the invoker is allowed
@@ -146,13 +146,13 @@ async def list_words(ctx):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_exception(ctx, word):
     exception_words.add(word.lower())
-    await ctx.send(f'The exception word "{word}" has been added.')
+    await ctx.send(f'예외 단어 "{word}" 추가해드림')
 
 @bot.command(name='remove_exception')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_exception(ctx, word):
     exception_words.discard(word.lower())
-    await ctx.send(f'The exception word "{word}" has been removed.')
+    await ctx.send(f'"{word}"이것도 이제 예외 아님')
 
 @bot.command(name='list_exception')
 @commands.check(is_allowed)  # Check if the invoker is allowed
@@ -163,21 +163,22 @@ async def list_exception(ctx):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_user(ctx, user_id: int):
     target_users.add(user_id)
-    await ctx.send(f'The user with ID {user_id} has been added to the list of targeted users.')
+    member = ctx.guild.get_member(user_id)
+    await ctx.send(f'앞으로 {member.mention}님도 검열 대상임 알아서 하셈')
 
 @bot.command(name='remove_user')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_user(ctx, user_id: int):
     try:
         target_users.remove(user_id)
-        await ctx.send(f'The user with ID {user_id} has been removed from the list of targeted users.')
+        member = ctx.guild.get_member(user_id)
+        await ctx.send(f'{member.mention}님 석방임 ㅊㅊ')
         # Check if the first error message has been sent for this member
-        if first_error_message_sent.get(ctx.author.id) is None:
+        if first_error_message_sent.get(user_id) is None:
             # Set the flag to True
-            first_error_message_sent[ctx.author.id] = True
-            # Send the error message
+            first_error_message_sent[user_id] = True
     except ValueError:
-        await ctx.send(f'The user with ID {user_id} was not in the list of targeted users.')
+        await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
 @bot.command(name='list_users')
 @commands.check(is_allowed)  # Check if the invoker is allowed
@@ -188,25 +189,34 @@ async def list_users(ctx):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_allow(ctx, user_id: int = None):
     if user_id is None:
-        await ctx.send("Please provide a user ID.")
+        await ctx.send("유저 ID를 똑바로 붙이라고.")
         return
 
-    allowed_command_users.add(user_id)
-    await ctx.send(f'The user with ID {user_id} has been added to the list of allowed command users.')
+    member = ctx.guild.get_member(user_id)
+    if member:
+        allowed_command_users.add(user_id)
+        user_mention = member.mention
+        await ctx.send(f'{user_mention}님 커맨드 쓰십쇼.')
+    else:
+        await ctx.send(f"해당 서버의 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.")
 
 @bot.command(name='remove_allow')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_allow(ctx, user_id: int = None):
     if user_id is None:
-        await ctx.send("Please provide a user ID.")
+        await ctx.send("유저 ID를 똑바로 붙이라고.")
         return
 
-    if user_id in allowed_command_users:
-        allowed_command_users.remove(user_id)
-        await ctx.send(f'The user with ID {user_id} has been removed from the list of allowed command users.')
+    member = ctx.guild.get_member(user_id)
+    if member:
+        if user_id in allowed_command_users:
+            allowed_command_users.remove(user_id)
+            user_mention = member.mention
+            await ctx.send(f'{user_mention}님 커맨드 권한 해제요 .')
+        else:
+            await ctx.send(f'{user_id}에 해당하는 사용자가 권한 목록에 존재하지 않습니다.')
     else:
-        await ctx.send(f'The user with ID {user_id} was not in the list of allowed command users.')
-
+        await ctx.send(f"해당 서버의 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.")
 
 @bot.command(name='list_allowed')
 @commands.check(is_allowed)  # Check if the invoker is allowed
@@ -260,8 +270,13 @@ async def on_command_error(ctx, error):
             first_error_message_sent[ctx.author.id] = True
             # Send the error message
             await ctx.send("님 권한 없음 ㅅㄱ")
+    elif isinstance(error, commands.CommandNotFound):
+        # Send the error message for CommandNotFound
+        await ctx.send("님 명령어 잘못 적음")
+        # Check if the first error message has been sent for this member
     else:
         raise error
+
 
 # 봇을 실행
 bot.run(TOKEN)
