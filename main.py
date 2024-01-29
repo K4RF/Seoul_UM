@@ -16,6 +16,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 banned_words = set(TARGET_WORDS)
 exception_words = set(EXCEPTION_WORDS)
 target_users = set(TARGET_USERS)
+allowed_command_users = set(ALLOWED_USERS)
 
 # 멤버별 처음 삭제 시간을 저장할 딕셔너리
 first_deletion_time = {}
@@ -33,7 +34,7 @@ def find_role(guild, role_name):
 
 # Define a decorator to check if the command invoker is allowed
 def is_allowed(ctx):
-    return ctx.author.id in ALLOWED_USERS
+    return ctx.author.id in allowed_command_users
 
 # Dictionary to store whether the first error message has been sent for each member
 first_error_message_sent = {}
@@ -76,7 +77,6 @@ async def on_message(message):
         for target_word in banned_words:
             if (
                 target_word.lower() in message.content.lower()
-                or any(user.id in [mention.id for mention in message.mentions] for user in message.guild.members)
                 or any(role.id in TARGET_ROLE_IDS for role in message.role_mentions)
             ):
                 # 예외 단어가 포함된 경우 처리하지 않음
@@ -176,7 +176,6 @@ async def remove_user(ctx, user_id: int):
             # Set the flag to True
             first_error_message_sent[ctx.author.id] = True
             # Send the error message
-            await ctx.send("You don't have the permission to execute this command.")
     except ValueError:
         await ctx.send(f'The user with ID {user_id} was not in the list of targeted users.')
 
@@ -185,8 +184,37 @@ async def remove_user(ctx, user_id: int):
 async def list_users(ctx):
     await ctx.send(f'Targeted users: {", ".join(str(user_id) for user_id in target_users)}')
 
-@bot.command(name='shutdown')
+@bot.command(name='add_allow')
 @commands.check(is_allowed)  # Check if the invoker is allowed
+async def add_allow(ctx, user_id: int = None):
+    if user_id is None:
+        await ctx.send("Please provide a user ID.")
+        return
+
+    allowed_command_users.add(user_id)
+    await ctx.send(f'The user with ID {user_id} has been added to the list of allowed command users.')
+
+@bot.command(name='remove_allow')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def remove_allow(ctx, user_id: int = None):
+    if user_id is None:
+        await ctx.send("Please provide a user ID.")
+        return
+
+    if user_id in allowed_command_users:
+        allowed_command_users.remove(user_id)
+        await ctx.send(f'The user with ID {user_id} has been removed from the list of allowed command users.')
+    else:
+        await ctx.send(f'The user with ID {user_id} was not in the list of allowed command users.')
+
+
+@bot.command(name='list_allowed')
+@commands.check(is_allowed)  # Check if the invoker is allowed
+async def list_allowed(ctx):
+    await ctx.send(f'Allowed command users: {", ".join(str(user_id) for user_id in allowed_command_users)}')
+
+@bot.command(name='shutdown')
+@commands.check(is_allowed)  # Check if the invoker is allowed to use commands
 async def shutdown(ctx):
     global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
     delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
@@ -196,7 +224,7 @@ async def shutdown(ctx):
     await bot.close()
 
 @bot.command(name='logout')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@commands.check(is_allowed)  # Check if the invoker is allowed to use commands
 async def logout(ctx):
     global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
     if not logout_done:
@@ -209,7 +237,7 @@ async def logout(ctx):
         await ctx.send('이미 로그아웃이 수행되었습니다.')
 
 @bot.command(name='restart')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@commands.check(is_allowed)  # Check if the invoker is allowed to use commands
 async def restart(ctx):
     global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
     if not restart_done:
