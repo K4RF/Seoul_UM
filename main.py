@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
-from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS, save_data, load_data
+from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
+from data_management import save_data, load_data
 from datetime import datetime, timedelta
 import asyncio
 
