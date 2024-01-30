@@ -1,46 +1,48 @@
-from discord.ext import commands
 import discord
+from discord.ext import commands
+from datetime import datetime, timedelta
+import asyncio
+from data_management import save_data, load_data
 from config import (
     TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS,
-    ALLOWED_USERS, save_data, load_data
+    ALLOWED_USERS, target_channel_id
 )
-import asyncio
 
 async def send_delayed_message(member, content):
-    await asyncio.sleep(60 * 60)  # 60분
+    await asyncio.sleep(60 * 60)  # 60 minutes
     try:
         await member.send(content)
     except discord.errors.Forbidden:
-        pass  # DM이 차단되어 있는 경우 무시
+        pass  # Ignore if DMs are blocked
 
-# 파일에서 데이터 불러오기
+# Load data from file
 data = load_data()
 
-# 금지어와 대상 사용자를 저장하는 세트
+# Extract banned words, exceptions, target users, and allowed command users
 banned_words = set(data.get('banned_words', TARGET_WORDS))
 exception_words = set(data.get('exception_words', EXCEPTION_WORDS))
 target_users = set(data.get('target_users', TARGET_USERS))
 allowed_command_users = set(data.get('allowed_command_users', ALLOWED_USERS))
 
-# 멤버별 처음 삭제 시간을 저장할 딕셔너리
+# Dictionary to store the first deletion time for each member
 first_deletion_time = {}
 
-# 봇의 삭제 기능 활성/비활성 상태를 나타내는 변수
+# Variable to indicate whether the delete functionality is enabled
 delete_enabled = True
 
-# 로그아웃 및 재시작 여부를 나타내는 변수
+# Variables to indicate whether logout and restart have been done
 logout_done = False
 restart_done = False
 
-# 역할 이름을 기반으로 역할을 찾는 함수
+# Function to find a role based on its name
 def find_role(guild, role_name):
     return discord.utils.get(guild.roles, name=role_name)
 
-# 명령어 호출자가 허용된 사용자인지 확인하는 데코레이터 정의
+# Decorator to check if the command invoker is allowed
 def is_allowed(ctx):
     return ctx.author.id in allowed_command_users
 
-# 각 멤버에 대한 첫 오류 메시지 전송 여부를 저장하는 딕셔너리
+# Dictionary to store whether the first error message has been sent for each member
 first_error_message_sent = {}
 
 # 봇 명령어 설정 함수
@@ -146,11 +148,12 @@ def setup_commands(bot):
     @bot.command(name='shutdown')
     @commands.check(is_allowed)  # Check if the invoker is allowed to use commands
     async def shutdown(ctx):
-        global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+        global delete_enabled, logout_done, restart_done, data  # 삭제 기능 및 상태 변수 전역 변수 사용
         delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
         logout_done = True  # 로그아웃이 수행됨을 표시
         restart_done = True
         await ctx.send('계엄령이 해제되었습니다.')
+        save_data(data)  # 변경된 데이터 저장
         await bot.close()
 
     @bot.command(name='logout')
@@ -163,6 +166,7 @@ def setup_commands(bot):
             restart_done = False
             await ctx.send('계엄령이 임시 해제되었습니다')
             await bot.change_presence(status=discord.Status.idle)
+            save_data()  # 변경된 데이터 저장
         else:
             await ctx.send('이미 로그아웃이 수행되었습니다.')
 
@@ -178,5 +182,6 @@ def setup_commands(bot):
             # 봇을 다시 활성화하는 코드 추가
             await bot.change_presence(status=discord.Status.online)
             await ctx.send('계엄령을 재선포합니다.')
+            save_data()  # 변경된 데이터 저장
         else:
             await ctx.send('이미 재시작이 수행되었습니다.')

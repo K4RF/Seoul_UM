@@ -1,3 +1,5 @@
+# event_handler.py
+
 import discord
 from discord.ext import commands
 from datetime import datetime, timedelta
@@ -50,6 +52,7 @@ def setup_event_handlers(bot):
         target_channel = bot.get_channel(target_channel_id)
         if target_channel:
             await target_channel.send(f'계엄령이 해제되었습니다.')
+        save_data(data)
 
     @bot.event
     async def on_message(message):
@@ -79,6 +82,7 @@ def setup_event_handlers(bot):
                     except discord.errors.NotFound:
                         pass  # 메시지가 이미 삭제된 경우 무시
                     except discord.errors.HTTPException as e:
+                        print(f"Error deleting message: {e}")
                         if e.status == 429:
                             # Rate Limit이 발생한 경우, 1초 대기 후 다시 시도
                             await asyncio.sleep(1)  # 1초
