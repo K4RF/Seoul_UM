@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
+from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS, save_data, load_data
 from datetime import datetime, timedelta
 import asyncio
 
@@ -12,11 +12,14 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# Load data from file
+data = load_data()
+
 # Sets to store banned words and targeted users
-banned_words = set(TARGET_WORDS)
-exception_words = set(EXCEPTION_WORDS)
-target_users = set(TARGET_USERS)
-allowed_command_users = set(ALLOWED_USERS)
+banned_words = set(data.get('banned_words', TARGET_WORDS))
+exception_words = set(data.get('exception_words', EXCEPTION_WORDS))
+target_users = set(data.get('target_users', TARGET_USERS))
+allowed_command_users = set(data.get('allowed_command_users', ALLOWED_USERS))
 
 # 멤버별 처음 삭제 시간을 저장할 딕셔너리
 first_deletion_time = {}
@@ -129,12 +132,14 @@ async def on_message(message):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_word(ctx, word):
     banned_words.add(word.lower())
+    save_data({'banned_words': list(banned_words)})
     await ctx.send(f'이제 님들 "{word}"도 못 씀')
 
 @bot.command(name='remove_word')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_word(ctx, word):
     banned_words.discard(word.lower())
+    save_data({'banned_words': list(banned_words)})
     await ctx.send(f'"{word}"은 쓰십쇼')
 
 @bot.command(name='list_words')
@@ -146,12 +151,14 @@ async def list_words(ctx):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_exception(ctx, word):
     exception_words.add(word.lower())
+    save_data({'exception_words': list(exception_words)})
     await ctx.send(f'예외 단어 "{word}" 추가해드림')
 
 @bot.command(name='remove_exception')
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_exception(ctx, word):
     exception_words.discard(word.lower())
+    save_data({'exception_words': list(exception_words)})
     await ctx.send(f'"{word}"이것도 이제 예외 아님')
 
 @bot.command(name='list_exception')
@@ -163,6 +170,7 @@ async def list_exception(ctx):
 @commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_user(ctx, user_id: int):
     target_users.add(user_id)
+    save_data({'target_users': list(target_users)})
     member = ctx.guild.get_member(user_id)
     await ctx.send(f'앞으로 {member.mention}님도 검열 대상임 알아서 하셈')
 
@@ -171,6 +179,7 @@ async def add_user(ctx, user_id: int):
 async def remove_user(ctx, user_id: int):
     try:
         target_users.remove(user_id)
+        save_data({'target_users': list(target_users)})
         member = ctx.guild.get_member(user_id)
         await ctx.send(f'{member.mention}님 석방임 ㅊㅊ')
         # Check if the first error message has been sent for this member
@@ -195,6 +204,7 @@ async def add_allow(ctx, user_id: int = None):
     member = ctx.guild.get_member(user_id)
     if member:
         allowed_command_users.add(user_id)
+        save_data({'allowed_command_users': list(allowed_command_users)})
         user_mention = member.mention
         await ctx.send(f'{user_mention}님 커맨드 쓰십쇼.')
     else:
@@ -211,6 +221,7 @@ async def remove_allow(ctx, user_id: int = None):
     if member:
         if user_id in allowed_command_users:
             allowed_command_users.remove(user_id)
+            save_data({'allowed_command_users': list(allowed_command_users)})
             user_mention = member.mention
             await ctx.send(f'{user_mention}님 커맨드 권한 해제요 .')
         else:
@@ -276,7 +287,6 @@ async def on_command_error(ctx, error):
         # Check if the first error message has been sent for this member
     else:
         raise error
-
 
 # 봇을 실행
 bot.run(TOKEN)
