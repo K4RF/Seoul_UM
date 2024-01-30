@@ -84,22 +84,26 @@ def setup_commands(bot):
         await ctx.send(f'Exception words: {", ".join(exception_words)}')
 
     @bot.command(name='add_user')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def add_user(ctx, user_id: int):
         target_users.add(user_id)
+        first_deletion_time.setdefault(user_id, None)  # 해당 사용자를 딕셔너리에 추가 (기본값은 None)
         save_data({'target_users': list(target_users)})
         member = ctx.guild.get_member(user_id)
         await ctx.send(f'앞으로 {member.mention}님도 검열 대상임 알아서 하셈')
 
     @bot.command(name='remove_user')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def remove_user(ctx, user_id: int):
         try:
             target_users.remove(user_id)
+            first_deletion_time.pop(user_id, None)  # 해당 사용자가 삭제되면 first_deletion_time에서도 삭제
             save_data({'target_users': list(target_users)})
             member = ctx.guild.get_member(user_id)
             await ctx.send(f'{member.mention}님 석방임 ㅊㅊ')
+            # Check if the first error message has been sent for this member
             if first_error_message_sent.get(user_id) is None:
+                # Set the flag to True
                 first_error_message_sent[user_id] = True
         except ValueError:
             await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
@@ -148,3 +152,41 @@ def setup_commands(bot):
     @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
     async def list_allowed(ctx):
         await ctx.send(f'Allowed command users: {", ".join(str(user_id) for user_id in allowed_command_users)}')
+    
+    @bot.command(name='shutdown')
+    @commands.check(is_allowed)  # Check if the invoker is allowed to use commands
+    async def shutdown(ctx):
+        global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+        delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
+        logout_done = True  # 로그아웃이 수행됨을 표시
+        restart_done = True
+        await ctx.send('계엄령이 해제되었습니다.')
+        await bot.close()
+
+    @bot.command(name='logout')
+    @commands.check(is_allowed)  # Check if the invoker is allowed to use commands
+    async def logout(ctx):
+        global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+        if not logout_done:
+            delete_enabled = False  # 로그아웃 시 삭제 기능 비활성화
+            logout_done = True  # 로그아웃이 수행됨을 표시
+            restart_done = False
+            await ctx.send('계엄령이 임시 해제되었습니다')
+            await bot.change_presence(status=discord.Status.idle)
+        else:
+            await ctx.send('이미 로그아웃이 수행되었습니다.')
+
+    @bot.command(name='restart')
+    @commands.check(is_allowed)  # Check if the invoker is allowed to use commands
+    async def restart(ctx):
+        global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+        if not restart_done:
+            delete_enabled = True  # 재시작 시 삭제 기능 다시 활성화
+            restart_done = True  # 재시작이 수행됨을 표시
+            logout_done = False
+
+            # 봇을 다시 활성화하는 코드 추가
+            await bot.change_presence(status=discord.Status.online)
+            await ctx.send('계엄령을 재선포합니다.')
+        else:
+            await ctx.send('이미 재시작이 수행되었습니다.')
