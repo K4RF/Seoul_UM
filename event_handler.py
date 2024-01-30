@@ -5,8 +5,9 @@ import asyncio
 from command import send_delayed_message
 from config import (
     TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS,
-    ALLOWED_USERS, save_data, load_data, target_channel_id
+    ALLOWED_USERS, target_channel_id
 )
+from data_management import save_data, load_data
 
 data = load_data()
 
@@ -18,6 +19,10 @@ first_deletion_time = {}
 first_error_message_sent = {}  # 이 부분을 추가해주면 됩니다.
 
 delete_enabled = True
+
+# 역할 이름을 기반으로 역할을 찾는 함수
+def find_role(guild, role_name):
+    return discord.utils.get(guild.roles, name=role_name)
 
 # ... (다른 전역 변수 및 필요한 부분 추가)
 
