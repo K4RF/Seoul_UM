@@ -26,13 +26,18 @@ def setup_event_handlers(bot):
     @bot.event
     async def on_ready():
         print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
-        global first_error_message_sent
-        first_error_message_sent = {}  # on_ready 이벤트에서 초기화
 
         # 봇이 켜질 때 메시지를 특정 채널에 보냅니다.
         target_channel = bot.get_channel(target_channel_id)
         if target_channel:
             await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다!')
+
+    async def send_delayed_message(member, content):
+        await asyncio.sleep(60 * 60)  # 60분
+        try:
+            await member.send(content)
+        except discord.errors.Forbidden:
+            pass  # DM이 차단되어 있는 경우 무시
 
     @bot.event
     async def on_shutdown():
@@ -43,7 +48,7 @@ def setup_event_handlers(bot):
 
     @bot.event
     async def on_message(message):
-        global delete_enabled, first_deletion_time, first_error_message_sent  # 삭제 기능 및 시간 변수 사용
+        global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
 
         if message.author.id in target_users and delete_enabled:
             current_time = datetime.utcnow()
@@ -77,16 +82,13 @@ def setup_event_handlers(bot):
                             except discord.errors.NotFound:
                                 pass  # 메시지가 이미 삭제된 경우 무시
 
-                    if fetched_message and fetched_message.author.id == bot.user.id:
-                        return  # 봇이 보낸 메시지는 처리하지 않음
-
                     if fetched_message:
                         try:
                             await fetched_message.delete()
                         except discord.errors.NotFound:
                             pass  # 메시지가 이미 삭제된 경우 무시
 
-                        if first_time is None or current_time > first_time + timedelta(minutes=60):
+                        if first_time is None:
                             try:
                                 await message.channel.send(
                                     f'{message.author.mention}, 그 단어 쓰지 말라 했제. '
@@ -103,21 +105,23 @@ def setup_event_handlers(bot):
                                             f'이번만 알려준다'
                             bot.loop.create_task(send_delayed_message(member, delayed_message))
 
-                        return  # 다음 동작을 방지하기 위해 리턴
+                    return  # 다음 동작을 방지하기 위해 리턴
 
         await bot.process_commands(message)
+
 
     @bot.event
     async def on_command_error(ctx, error):
         if isinstance(error, commands.CheckFailure):
+            # Check if the first error message has been sent for this member
             if first_error_message_sent.get(ctx.author.id) is None:
+                # Set the flag to True
                 first_error_message_sent[ctx.author.id] = True
+                # Send the error message
                 await ctx.send("님 권한 없음 ㅅㄱ")
         elif isinstance(error, commands.CommandNotFound):
+            # Send the error message for CommandNotFound
             await ctx.send("님 명령어 잘못 적음")
+            # Check if the first error message has been sent for this member
         else:
             raise error
-
-    # ... (다른 이벤트 핸들러 추가 가능)
-
-# ... (다른 함수 및 클래스를 추가하여 필요한 부분을 포함 가능)

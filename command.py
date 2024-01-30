@@ -46,40 +46,36 @@ first_error_message_sent = {}
 # 봇 명령어 설정 함수
 def setup_commands(bot):
     @bot.command(name='add_word')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def add_word(ctx, word):
         banned_words.add(word.lower())
-        save_data({'banned_words': list(banned_words)})
         await ctx.send(f'이제 님들 "{word}"도 못 씀')
 
     @bot.command(name='remove_word')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def remove_word(ctx, word):
         banned_words.discard(word.lower())
-        save_data({'banned_words': list(banned_words)})
         await ctx.send(f'"{word}"은 쓰십쇼')
 
     @bot.command(name='list_words')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def list_words(ctx):
         await ctx.send(f'Banned words: {", ".join(banned_words)}')
 
     @bot.command(name='add_exception')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def add_exception(ctx, word):
         exception_words.add(word.lower())
-        save_data({'exception_words': list(exception_words)})
         await ctx.send(f'예외 단어 "{word}" 추가해드림')
 
     @bot.command(name='remove_exception')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def remove_exception(ctx, word):
         exception_words.discard(word.lower())
-        save_data({'exception_words': list(exception_words)})
         await ctx.send(f'"{word}"이것도 이제 예외 아님')
 
     @bot.command(name='list_exception')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def list_exception(ctx):
         await ctx.send(f'Exception words: {", ".join(exception_words)}')
 
@@ -87,8 +83,6 @@ def setup_commands(bot):
     @commands.check(is_allowed)  # Check if the invoker is allowed
     async def add_user(ctx, user_id: int):
         target_users.add(user_id)
-        first_deletion_time.setdefault(user_id, None)  # 해당 사용자를 딕셔너리에 추가 (기본값은 None)
-        save_data({'target_users': list(target_users)})
         member = ctx.guild.get_member(user_id)
         await ctx.send(f'앞으로 {member.mention}님도 검열 대상임 알아서 하셈')
 
@@ -97,8 +91,6 @@ def setup_commands(bot):
     async def remove_user(ctx, user_id: int):
         try:
             target_users.remove(user_id)
-            first_deletion_time.pop(user_id, None)  # 해당 사용자가 삭제되면 first_deletion_time에서도 삭제
-            save_data({'target_users': list(target_users)})
             member = ctx.guild.get_member(user_id)
             await ctx.send(f'{member.mention}님 석방임 ㅊㅊ')
             # Check if the first error message has been sent for this member
@@ -109,12 +101,12 @@ def setup_commands(bot):
             await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
     @bot.command(name='list_users')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def list_users(ctx):
         await ctx.send(f'Targeted users: {", ".join(str(user_id) for user_id in target_users)}')
 
     @bot.command(name='add_allow')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def add_allow(ctx, user_id: int = None):
         if user_id is None:
             await ctx.send("유저 ID를 똑바로 붙이라고.")
@@ -123,14 +115,13 @@ def setup_commands(bot):
         member = ctx.guild.get_member(user_id)
         if member:
             allowed_command_users.add(user_id)
-            save_data({'allowed_command_users': list(allowed_command_users)})
             user_mention = member.mention
             await ctx.send(f'{user_mention}님 커맨드 쓰십쇼.')
         else:
             await ctx.send(f"해당 서버의 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.")
 
     @bot.command(name='remove_allow')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def remove_allow(ctx, user_id: int = None):
         if user_id is None:
             await ctx.send("유저 ID를 똑바로 붙이라고.")
@@ -140,7 +131,6 @@ def setup_commands(bot):
         if member:
             if user_id in allowed_command_users:
                 allowed_command_users.remove(user_id)
-                save_data({'allowed_command_users': list(allowed_command_users)})
                 user_mention = member.mention
                 await ctx.send(f'{user_mention}님 커맨드 권한 해제요 .')
             else:
@@ -149,10 +139,10 @@ def setup_commands(bot):
             await ctx.send(f"해당 서버의 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.")
 
     @bot.command(name='list_allowed')
-    @commands.check(is_allowed)  # 명령어 호출자가 허용된 사용자인지 확인
+    @commands.check(is_allowed)  # Check if the invoker is allowed
     async def list_allowed(ctx):
         await ctx.send(f'Allowed command users: {", ".join(str(user_id) for user_id in allowed_command_users)}')
-    
+
     @bot.command(name='shutdown')
     @commands.check(is_allowed)  # Check if the invoker is allowed to use commands
     async def shutdown(ctx):
