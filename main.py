@@ -87,16 +87,14 @@ async def on_message(message):
                 if any(exception_word.lower() in message.content.lower() for exception_word in exception_words):
                     return
 
-                fetched_message = None  # Initialize to None outside the try block
+                fetched_message = None
                 try:
-                    # 메시지가 존재하는지 확인 후 삭제 시도
                     fetched_message = await message.channel.fetch_message(message.id)
                 except discord.errors.NotFound:
                     pass  # 메시지가 이미 삭제된 경우 무시
                 except discord.errors.HTTPException as e:
                     if e.status == 429:
-                        # Rate Limit이 발생한 경우, 1초 대기 후 다시 시도
-                        await asyncio.sleep(1)  # 1초
+                        await asyncio.sleep(1)  # Rate Limit이 발생한 경우 1초 대기 후 다시 시도
                         try:
                             fetched_message = await message.channel.fetch_message(message.id)
                         except discord.errors.NotFound:
@@ -117,10 +115,8 @@ async def on_message(message):
                         except discord.errors.NotFound:
                             pass  # 채널이 이미 삭제된 경우 무시
 
-                        # 현재 시간으로 업데이트
                         first_deletion_time[member] = current_time
 
-                        # 최초 삭제 시에만 멤버에게 다시 메시지 보내기
                         delayed_message = f'{message.author.mention}, 그 단어 쓰지 말라 했제. ' \
                                           f'이번만 알려준다'
                         bot.loop.create_task(send_delayed_message(member, delayed_message))
@@ -128,6 +124,47 @@ async def on_message(message):
                 return  # 다음 동작을 방지하기 위해 리턴
 
     await bot.process_commands(message)
+
+@bot.event
+async def on_message_edit(before, after):
+    # 금지어가 아니었다가 금지어로 수정된 경우를 검사
+    if after.author.id in target_users and delete_enabled:
+        current_time = datetime.utcnow()
+
+        member = after.guild.get_member(after.author.id)
+        first_time = first_deletion_time.get(member)
+
+        # 금지어가 포함된 경우만 처리
+        for target_word in banned_words:
+            if (
+                target_word.lower() in after.content.lower()
+                or any(role.id in TARGET_ROLE_IDS for role in after.role_mentions)
+            ):
+                # 예외 단어가 포함된 경우 처리하지 않음
+                if any(exception_word.lower() in after.content.lower() for exception_word in exception_words):
+                    return
+
+                try:
+                    await after.delete()
+                except discord.errors.NotFound:
+                    pass  # 메시지가 이미 삭제된 경우 무시
+
+                if first_time is None:
+                    try:
+                        await after.channel.send(
+                            f'{after.author.mention}, 그 단어 쓰지 말라 했제. '
+                            f'이번만 알려준다'
+                        )
+                    except discord.errors.NotFound:
+                        pass  # 채널이 이미 삭제된 경우 무시
+
+                    first_deletion_time[member] = current_time
+
+                    delayed_message = f'{after.author.mention}, 그 단어 쓰지 말라 했제. ' \
+                                      f'이번만 알려준다'
+                    bot.loop.create_task(send_delayed_message(member, delayed_message))
+
+                return  # 다음 동작을 방지하기 위해 리턴
 
 @bot.command(name='add_word')
 @commands.check(is_allowed)  # Check if the invoker is allowed
