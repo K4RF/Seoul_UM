@@ -157,7 +157,6 @@ async def remove_word(ctx, word):
     await ctx.send(f'"{word}"은 쓰십쇼')
 
 @bot.command(name='list_words')
-@commands.check(is_allowed)  # Check if the invoker is allowed
 async def list_words(ctx):
     await ctx.send(f'Banned words: {", ".join(banned_words)}')
 
@@ -176,7 +175,6 @@ async def remove_exception(ctx, word):
     await ctx.send(f'"{word}"이것도 이제 예외 아님')
 
 @bot.command(name='list_exception')
-@commands.check(is_allowed)  # Check if the invoker is allowed
 async def list_exception(ctx):
     await ctx.send(f'Exception words: {", ".join(exception_words)}')
 
@@ -204,7 +202,6 @@ async def remove_user(ctx, user_id: int):
         await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
 @bot.command(name='list_users')
-@commands.check(is_allowed)  # Check if the invoker is allowed
 async def list_users(ctx):
     await ctx.send(f'Targeted users: {", ".join(str(user_id) for user_id in target_users)}')
 
@@ -244,7 +241,6 @@ async def remove_allow(ctx, user_id: int = None):
         await ctx.send(f"해당 서버의 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.")
 
 @bot.command(name='list_allowed')
-@commands.check(is_allowed)  # Check if the invoker is allowed
 async def list_allowed(ctx):
     await ctx.send(f'Allowed command users: {", ".join(str(user_id) for user_id in allowed_command_users)}')
 
@@ -293,6 +289,7 @@ async def help_command(ctx):
     """
     help_message = (
         "**명령어 목록**\n"
+        "!list 명령어는 아무나 사용 가능"
         "`!add_word [단어]`: 금지어 목록에 단어를 추가합니다.\n"
         "`!remove_word [단어]`: 금지어 목록에서 단어를 제거합니다.\n"
         "`!list_words`: 금지어 목록을 표시합니다.\n"
@@ -322,8 +319,11 @@ async def on_command_error(ctx, error):
             await ctx.send("님 권한 없음 ㅅㄱ")
     elif isinstance(error, commands.CommandNotFound):
         # Send the error message for CommandNotFound
-        await ctx.send("님 명령어 잘못 적음")
         # Check if the first error message has been sent for this member
+        if first_error_message_sent.get(ctx.author.id) is None:
+            # Set the flag to True
+            first_error_message_sent[ctx.author.id] = True
+            await ctx.send("님 명령어 잘못 적음")
     else:
         raise error
 
