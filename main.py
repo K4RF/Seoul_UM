@@ -333,7 +333,7 @@ async def help_command(ctx):
         "`!remove_allow [유저ID]`: 커맨드 사용 권한을 해제합니다.\n"
         "`!list_allowed`: 커맨드 사용 권한이 부여된 유저 목록을 표시합니다.\n"
         "`!shutdown`: 봇을 종료합니다.\n"
-        "`!logout`: 봇을 로그아웃합니다.\n"
+        "`!logout`: 봇을 임시 중단합니다.\n"
         "`!restart`: 봇을 재시작합니다."
     )
     await ctx.send(help_message) 
