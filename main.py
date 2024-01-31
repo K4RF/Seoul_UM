@@ -13,6 +13,9 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# Disable the built-in help command
+bot.remove_command('help')
+
 # Load data from file
 data = load_data()
 
@@ -309,6 +312,31 @@ async def restart(ctx):
         await ctx.send('계엄령을 재선포합니다.')
     else:
         await ctx.send('이미 재시작이 수행되었습니다.')
+
+@bot.command(name='help')
+async def help_command(ctx):
+    """
+    봇의 사용 가능한 명령어와 간단한 설명을 표시합니다.
+    """
+    help_message = (
+        "**명령어 목록**\n"
+        "`!add_word [단어]`: 금지어 목록에 단어를 추가합니다.\n"
+        "`!remove_word [단어]`: 금지어 목록에서 단어를 제거합니다.\n"
+        "`!list_words`: 금지어 목록을 표시합니다.\n"
+        "`!add_exception [단어]`: 예외 단어 목록에 단어를 추가합니다.\n"
+        "`!remove_exception [단어]`: 예외 단어 목록에서 단어를 제거합니다.\n"
+        "`!list_exception`: 예외 단어 목록을 표시합니다.\n"
+        "`!add_user [유저ID]`: 검열 대상 목록에 유저를 추가합니다.\n"
+        "`!remove_user [유저ID]`: 검열 대상 목록에서 유저를 제거합니다.\n"
+        "`!list_users`: 검열 대상 목록을 표시합니다.\n"
+        "`!add_allow [유저ID]`: 커맨드 사용 권한을 부여합니다.\n"
+        "`!remove_allow [유저ID]`: 커맨드 사용 권한을 해제합니다.\n"
+        "`!list_allowed`: 커맨드 사용 권한이 부여된 유저 목록을 표시합니다.\n"
+        "`!shutdown`: 봇을 종료합니다.\n"
+        "`!logout`: 봇을 로그아웃합니다.\n"
+        "`!restart`: 봇을 재시작합니다."
+    )
+    await ctx.send(help_message) 
 
 @bot.event
 async def on_command_error(ctx, error):
