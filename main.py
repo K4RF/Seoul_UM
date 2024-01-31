@@ -69,10 +69,8 @@ async def on_shutdown():
     if target_channel:
         await target_channel.send(f'계엄령이 해제되었습니다.')
 
-@bot.event
-async def on_message(message):
-    global delete_enabled  # 삭제 기능 활성/비활성 상태 전역 변수 사용
-
+# Function to check if a message contains banned words and handle it
+async def check_and_handle_banned_words(message, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS):
     if message.author.id in target_users and delete_enabled:
         current_time = datetime.utcnow()
 
@@ -125,49 +123,24 @@ async def on_message(message):
                         bot.loop.create_task(send_delayed_message(member, delayed_message))
 
                 return  # 다음 동작을 방지하기 위해 리턴
+            
+@bot.event
+async def on_message(message):
+    global delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS  # 삭제 기능 상태 및 금지어 관련 변수 전역 변수 사용
+
+    # Check and handle banned words
+    await check_and_handle_banned_words(message, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
 
     await bot.process_commands(message)
 
+# Message edit event
 @bot.event
 async def on_message_edit(before, after):
-    # 금지어가 아니었다가 금지어로 수정된 경우를 검사
-    if after.author.id in target_users and delete_enabled:
-        current_time = datetime.utcnow()
+    global delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS  # 삭제 기능 상태 및 금지어 관련 변수 전역 변수 사용
 
-        member = after.guild.get_member(after.author.id)
-        first_time = first_deletion_time.get(member)
+    # Check and handle banned words
+    await check_and_handle_banned_words(after, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
 
-        # 금지어가 포함된 경우만 처리
-        for target_word in banned_words:
-            if (
-                target_word.lower() in after.content.lower()
-                or any(role.id in TARGET_ROLE_IDS for role in after.role_mentions)
-            ):
-                # 예외 단어가 포함된 경우 처리하지 않음
-                if any(exception_word.lower() in after.content.lower() for exception_word in exception_words):
-                    return
-
-                try:
-                    await after.delete()
-                except discord.errors.NotFound:
-                    pass  # 메시지가 이미 삭제된 경우 무시
-
-                if first_time is None:
-                    try:
-                        await after.channel.send(
-                            f'{after.author.mention}, 그 단어 쓰지 말라 했제. '
-                            f'이번만 알려준다'
-                        )
-                    except discord.errors.NotFound:
-                        pass  # 채널이 이미 삭제된 경우 무시
-
-                    first_deletion_time[member] = current_time
-
-                    delayed_message = f'{after.author.mention}, 그 단어 쓰지 말라 했제. ' \
-                                      f'이번만 알려준다'
-                    bot.loop.create_task(send_delayed_message(member, delayed_message))
-
-                return  # 다음 동작을 방지하기 위해 리턴
 
 @bot.command(name='add_word')
 @commands.check(is_allowed)  # Check if the invoker is allowed
