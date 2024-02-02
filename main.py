@@ -1,5 +1,7 @@
 import discord
 from discord.ext import commands
+from discord_slash import SlashCommand, SlashContext
+from discord_slash.utils.manage_commands import create_option
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
 from data_management import save_data, load_data
 from datetime import datetime, timedelta
@@ -12,6 +14,7 @@ intents.guilds = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
+slash = SlashCommand(bot, sync_commands=True)
 
 # Disable the built-in help command
 bot.remove_command('help')
@@ -142,72 +145,63 @@ async def on_message_edit(before, after):
     await check_and_handle_banned_words(after, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
 
 
-@bot.command(name='add_word')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_word(ctx, word):
+@slash.slash(name='add_word', description='Add a word to the banned list', options=[create_option(name='word', description='The word to add', option_type=3, required=True)])
+async def add_word(ctx: SlashContext, word: str):
     banned_words.add(word.lower())
     save_data({'banned_words': list(banned_words)})
     await ctx.send(f'이제 님들 "{word}"도 못 씀')
 
-@bot.command(name='remove_word')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_word(ctx, word):
+@slash.slash(name='remove_word', description='Remove a word from the banned list', options=[create_option(name='word', description='The word to remove', option_type=3, required=True)])
+async def remove_word(ctx: SlashContext, word: str):
     banned_words.discard(word.lower())
     save_data({'banned_words': list(banned_words)})
     await ctx.send(f'"{word}"은 쓰십쇼')
 
-@bot.command(name='list_words')
-async def list_words(ctx):
+@slash.slash(name='list_words', description='List all banned words')
+async def list_words(ctx: SlashContext):
     await ctx.send(f'Banned words: {", ".join(banned_words)}')
 
-@bot.command(name='add_exception')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_exception(ctx, word):
+@slash.slash(name='add_exception', description='Add an exception word', options=[create_option(name='word', description='The exception word to add', option_type=3, required=True)])
+async def add_exception(ctx: SlashContext, word: str):
     exception_words.add(word.lower())
     save_data({'exception_words': list(exception_words)})
     await ctx.send(f'예외 단어 "{word}" 추가해드림')
 
-@bot.command(name='remove_exception')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_exception(ctx, word):
+@slash.slash(name='remove_exception', description='Remove an exception word', options=[create_option(name='word', description='The exception word to remove', option_type=3, required=True)])
+async def remove_exception(ctx: SlashContext, word: str):
     exception_words.discard(word.lower())
     save_data({'exception_words': list(exception_words)})
     await ctx.send(f'"{word}"이것도 이제 예외 아님')
 
-@bot.command(name='list_exception')
-async def list_exception(ctx):
+@slash.slash(name='list_exception', description='List all exception words')
+async def list_exception(ctx: SlashContext):
     await ctx.send(f'Exception words: {", ".join(exception_words)}')
 
-@bot.command(name='add_user')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_user(ctx, user_id: int):
+@slash.slash(name='add_user', description='Add a user to the targeted list', options=[create_option(name='user_id', description='The user ID to add', option_type=3, required=True)])
+async def add_user(ctx: SlashContext, user_id: int):
     target_users.add(user_id)
     save_data({'target_users': list(target_users)})
     member = ctx.guild.get_member(user_id)
     await ctx.send(f'앞으로 {member.mention}님도 검열 대상임 알아서 하셈')
 
-@bot.command(name='remove_user')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_user(ctx, user_id: int):
+@slash.slash(name='remove_user', description='Remove a user from the targeted list', options=[create_option(name='user_id', description='The user ID to remove', option_type=3, required=True)])
+async def remove_user(ctx: SlashContext, user_id: int):
     try:
         target_users.remove(user_id)
         save_data({'target_users': list(target_users)})
         member = ctx.guild.get_member(user_id)
         await ctx.send(f'{member.mention}님 석방임 ㅊㅊ')
-        # Check if the first error message has been sent for this member
         if first_error_message_sent.get(user_id) is None:
-            # Set the flag to True
             first_error_message_sent[user_id] = True
     except ValueError:
         await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
-@bot.command(name='list_users')
-async def list_users(ctx):
+@slash.slash(name='list_users', description='List all targeted users')
+async def list_users(ctx: SlashContext):
     await ctx.send(f'Targeted users: {", ".join(str(user_id) for user_id in target_users)}')
 
-@bot.command(name='add_allow')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_allow(ctx, user_id: int = None):
+@slash.slash(name='add_allow', description='Grant command usage permission to a user', options=[create_option(name='user_id', description='The user ID to grant permission', option_type=3, required=True)])
+async def add_allow(ctx: SlashContext, user_id: int):
     if user_id is None:
         await ctx.send("유저 ID를 똑바로 붙이라고.")
         return
@@ -221,9 +215,8 @@ async def add_allow(ctx, user_id: int = None):
     else:
         await ctx.send(f"해당 서버의 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.")
 
-@bot.command(name='remove_allow')
-@commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_allow(ctx, user_id: int = None):
+@slash.slash(name='remove_allow', description='Revoke command usage permission from a user', options=[create_option(name='user_id', description='The user ID to revoke permission', option_type=3, required=True)])
+async def remove_allow(ctx: SlashContext, user_id: int):
     if user_id is None:
         await ctx.send("유저 ID를 똑바로 붙이라고.")
         return
@@ -240,73 +233,68 @@ async def remove_allow(ctx, user_id: int = None):
     else:
         await ctx.send(f"해당 서버의 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.")
 
-@bot.command(name='list_allowed')
-async def list_allowed(ctx):
+@slash.slash(name='list_allowed', description='List all users with command usage permission')
+async def list_allowed(ctx: SlashContext):
     await ctx.send(f'Allowed command users: {", ".join(str(user_id) for user_id in allowed_command_users)}')
 
-@bot.command(name='shutdown')
-@commands.check(is_allowed)  # Check if the invoker is allowed to use commands
-async def shutdown(ctx):
-    global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
-    delete_enabled = False  # 봇 종료 시 삭제 기능 비활성화
-    logout_done = True  # 로그아웃이 수행됨을 표시
+@slash.slash(name='shutdown', description='Shutdown the bot')
+async def shutdown(ctx: SlashContext):
+    global delete_enabled, logout_done, restart_done
+    delete_enabled = False
+    logout_done = True
     restart_done = True
     await ctx.send('계엄령이 해제되었습니다.')
     await bot.close()
 
-@bot.command(name='logout')
-@commands.check(is_allowed)  # Check if the invoker is allowed to use commands
-async def logout(ctx):
-    global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+@slash.slash(name='logout', description='Temporarily stop the bot')
+async def logout(ctx: SlashContext):
+    global delete_enabled, logout_done, restart_done
     if not logout_done:
-        delete_enabled = False  # 로그아웃 시 삭제 기능 비활성화
-        logout_done = True  # 로그아웃이 수행됨을 표시
+        delete_enabled = False
+        logout_done = True
         restart_done = False
         await ctx.send('계엄령이 임시 해제되었습니다')
         await bot.change_presence(status=discord.Status.idle)
     else:
         await ctx.send('이미 로그아웃이 수행되었습니다.')
 
-@bot.command(name='restart')
-@commands.check(is_allowed)  # Check if the invoker is allowed to use commands
-async def restart(ctx):
-    global delete_enabled, logout_done, restart_done  # 삭제 기능 및 상태 변수 전역 변수 사용
+@slash.slash(name='restart', description='Restart the bot')
+async def restart(ctx: SlashContext):
+    global delete_enabled, logout_done, restart_done
     if not restart_done:
-        delete_enabled = True  # 재시작 시 삭제 기능 다시 활성화
-        restart_done = True  # 재시작이 수행됨을 표시
+        delete_enabled = True
+        restart_done = True
         logout_done = False
-
-        # 봇을 다시 활성화하는 코드 추가
         await bot.change_presence(status=discord.Status.online)
         await ctx.send('계엄령을 재선포합니다.')
     else:
         await ctx.send('이미 재시작이 수행되었습니다.')
 
-@bot.command(name='help')
-async def help_command(ctx):
+@slash.slash(name='help', description='Show available commands and their descriptions')
+async def help_command(ctx: SlashContext):
     """
     봇의 사용 가능한 명령어와 간단한 설명을 표시합니다.
     """
     help_message = (
         "**명령어 목록**\n"
-        "!list 명령어는 아무나 사용 가능"
-        "`!add_word [단어]`: 금지어 목록에 단어를 추가합니다.\n"
-        "`!remove_word [단어]`: 금지어 목록에서 단어를 제거합니다.\n"
-        "`!list_words`: 금지어 목록을 표시합니다.\n"
-        "`!add_exception [단어]`: 예외 단어 목록에 단어를 추가합니다.\n"
-        "`!remove_exception [단어]`: 예외 단어 목록에서 단어를 제거합니다.\n"
-        "`!list_exception`: 예외 단어 목록을 표시합니다.\n"
-        "`!add_user [유저ID]`: 검열 대상 목록에 유저를 추가합니다.\n"
-        "`!remove_user [유저ID]`: 검열 대상 목록에서 유저를 제거합니다.\n"
-        "`!list_users`: 검열 대상 목록을 표시합니다.\n"
-        "`!add_allow [유저ID]`: 커맨드 사용 권한을 부여합니다.\n"
-        "`!remove_allow [유저ID]`: 커맨드 사용 권한을 해제합니다.\n"
-        "`!list_allowed`: 커맨드 사용 권한이 부여된 유저 목록을 표시합니다.\n"
-        "`!shutdown`: 봇을 종료합니다.\n"
-        "`!logout`: 봇을 임시 중단합니다.\n"
-        "`!restart`: 봇을 재시작합니다."
+        "일반 명령어는 `!`를 사용하고, 슬래시 명령어는 `/`를 사용합니다.\n"
+        "`/add_word [단어]`: 금지어 목록에 단어를 추가합니다.\n"
+        "`/remove_word [단어]`: 금지어 목록에서 단어를 제거합니다.\n"
+        "`/list_words`: 금지어 목록을 표시합니다.\n"
+        "`/add_exception [단어]`: 예외 단어 목록에 단어를 추가합니다.\n"
+        "`/remove_exception [단어]`: 예외 단어 목록에서 단어를 제거합니다.\n"
+        "`/list_exception`: 예외 단어 목록을 표시합니다.\n"
+        "`/add_user [유저ID]`: 검열 대상 목록에 유저를 추가합니다.\n"
+        "`/remove_user [유저ID]`: 검열 대상 목록에서 유저를 제거합니다.\n"
+        "`/list_users`: 검열 대상 목록을 표시합니다.\n"
+        "`/add_allow [유저ID]`: 커맨드 사용 권한을 부여합니다.\n"
+        "`/remove_allow [유저ID]`: 커맨드 사용 권한을 해제합니다.\n"
+        "`/list_allowed`: 커맨드 사용 권한이 부여된 유저 목록을 표시합니다.\n"
+        "`/shutdown`: 봇을 종료합니다.\n"
+        "`/logout`: 봇을 임시 중단합니다.\n"
+        "`/restart`: 봇을 재시작합니다."
     )
-    await ctx.send(help_message) 
+    await ctx.send(help_message)
 
 @bot.event
 async def on_command_error(ctx, error):
