@@ -1,15 +1,16 @@
 import discord
 from discord.ext import commands
+import discord_slash
 from discord_slash import SlashCommand, SlashContext
-from discord_slash.utils.manage_commands import create_option
+from discord_slash.utils.manage_commands import get_all_commands, create_option
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
 from data_management import save_data, load_data
 from datetime import datetime, timedelta
 import asyncio
 
+# 수정된 코드
 intents = discord.Intents.default()
 intents.messages = True
-intents.message_content = True
 intents.guilds = True
 intents.members = True
 
@@ -50,14 +51,15 @@ def is_allowed(ctx):
 first_error_message_sent = {}
 
 async def setup():
-    global bot
-    slash = SlashCommand(bot, sync_commands=True)
+    global slash
+    existing_slash = await get_all_commands(bot.user.id, bot.http.token, test_guilds=None)
 
+# on_ready 함수 내의 setup 호출 부분을 수정
 @bot.event
 async def on_ready():
     print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
 
-    # 봇이 활성화될 때 메시지를 특정 채널에 보냅니다.
+    # 봇이 켜질 때 메시지를 특정 채널에 보냅니다.
     target_channel = bot.get_channel(target_channel_id)
     if target_channel:
         await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다!')
