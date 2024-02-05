@@ -51,8 +51,10 @@ def is_allowed(ctx):
 first_error_message_sent = {}
 
 async def setup():
-    global slash
-    existing_slash = await get_all_commands(bot.user.id, bot.http.token, test_guilds=None)
+    global slash  # Use the global slash variable
+
+    # Remove 'test_guilds' from the get_all_commands call
+    existing_slash = await get_all_commands(bot.user.id, bot.http.token)
 
 # on_ready 함수 내의 setup 호출 부분을 수정
 @bot.event
@@ -185,17 +187,19 @@ async def remove_exception(ctx: SlashContext, word: str):
 
 @slash.slash(name='list_exception', description='예외 단어 목록 표시')
 async def list_exception(ctx: SlashContext):
-    await ctx.send(f'예외 단어 목록: {", ".join(exception_words)}')
-
-@slash.slash(name='add_user', description='검열 대상 목록에 유저 추가', options=[create_option(name='user_id', description='추가할 유저 ID', option_type=3, required=True)])
-async def add_user(ctx: SlashContext, user_id: int):
-    global target_users
-    member = ctx.guild.get_member(user_id)
-    if member:
-        target_users.add(user_id)
-        save_data({'target_users': list(target_users)})
-        await ctx.send(f'앞으로 {member.mention}님도 검열 대상임 알아서 하셈')
+    if exception_words:
+        await ctx.send(f'예외 단어 목록: {", ".join(exception_words)}')
     else:
+        await ctx.send('예외 단어가 없습니다.')
+
+@@slash.slash(name='add_user', description='검열 대상 유저 추가', options=[create_option(name='user_id', description='추가할 유저의 ID', option_type=6, required=True)])
+async def add_user(ctx: SlashContext, user_id: int):
+    # 예외 처리를 추가합니다.
+    try:
+        member = await ctx.guild.fetch_member(user_id)
+        target_users.add(user_id)
+        await ctx.send(f'{member.display_name}님이 검열 대상 유저로 추가되었습니다.')
+    except discord.NotFound:
         await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
 
 @slash.slash(name='remove_user', description='검열 대상 목록에서 유저 제거', options=[create_option(name='user_id', description='제거할 유저 ID', option_type=3, required=True)])
@@ -211,9 +215,14 @@ async def remove_user(ctx: SlashContext, user_id: int):
     except ValueError:
         await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
-@slash.slash(name='list_users', description='검열 대상 목록 표시')
+@slash.slash(name='list_users', description='검열 대상 유저 목록 표시')
 async def list_users(ctx: SlashContext):
-    await ctx.send(f'검열 대상 유저 목록: {", ".join(str(user_id) for user_id in target_users)}')
+    # 예외 처리를 추가합니다.
+    if target_users:
+        user_mentions = [f'<@{user_id}>' for user_id in target_users]
+        await ctx.send(f'검열 대상 유저 목록: {", ".join(user_mentions)}')
+    else:
+        await ctx.send('검열 대상 유저가 없습니다.')
 
 @slash.slash(name='add_allow', description='유저에게 명령어 사용 권한 부여', options=[create_option(name='user_id', description='권한을 부여할 유저 ID', option_type=3, required=True)])
 async def add_allow(ctx: SlashContext, user_id: int):
