@@ -192,7 +192,7 @@ async def list_exception(ctx: SlashContext):
     else:
         await ctx.send('예외 단어가 없습니다.')
 
-@@slash.slash(name='add_user', description='검열 대상 유저 추가', options=[create_option(name='user_id', description='추가할 유저의 ID', option_type=6, required=True)])
+@slash.slash(name='add_user', description='검열 대상 유저 추가', options=[create_option(name='user_id', description='추가할 유저의 ID', option_type=6, required=True)])
 async def add_user(ctx: SlashContext, user_id: int):
     # 예외 처리를 추가합니다.
     try:
