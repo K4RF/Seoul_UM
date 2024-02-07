@@ -1,18 +1,17 @@
 import discord
 from discord.ext import commands
-import discord_slash
 from discord_slash import SlashCommand, SlashContext
-from discord_slash.utils.manage_commands import get_all_commands, create_option
+from discord_slash.utils.manage_commands import create_option
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
 from data_management import save_data, load_data
 from datetime import datetime, timedelta
 import asyncio
 
-# 수정된 코드
 intents = discord.Intents.default()
 intents.messages = True
 intents.guilds = True
 intents.members = True
+intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 slash = SlashCommand(bot, sync_commands=True)
@@ -43,29 +42,8 @@ restart_done = False
 def find_role(guild, role_name):
     return discord.utils.get(guild.roles, name=role_name)
 
-# 명령어 호출자가 허용되었는지 확인하는 데코레이터 정의
-def is_allowed(ctx):
-    return ctx.author.id in allowed_command_users
-
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
-
-async def setup():
-    global slash  # Use the global slash variable
-
-    # Remove 'test_guilds' from the get_all_commands call
-    existing_slash = await get_all_commands(bot.user.id, bot.http.token)
-
-# on_ready 함수 내의 setup 호출 부분을 수정
-@bot.event
-async def on_ready():
-    print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
-
-    # 봇이 켜질 때 메시지를 특정 채널에 보냅니다.
-    target_channel = bot.get_channel(target_channel_id)
-    if target_channel:
-        await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다!')
-    await setup()
 
 async def send_delayed_message(member, content):
     await asyncio.sleep(60 * 60)  # 60분
@@ -75,7 +53,16 @@ async def send_delayed_message(member, content):
         pass  # DM이 차단되어 있는 경우 무시
 
 @bot.event
-async def on_bot_shutdown():
+async def on_ready():
+    global slash
+    print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
+    target_channel = bot.get_channel(target_channel_id)
+    if target_channel:
+        await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다.')
+    await slash.sync_all_commands() 
+
+@bot.event
+async def on_shutdown():
     # 봇이 종료될 때 메시지를 특정 채널에 보냅니다.
     target_channel = bot.get_channel(target_channel_id)
     if target_channel:
@@ -135,7 +122,7 @@ async def check_and_handle_banned_words(message, delete_enabled, first_deletion_
                         bot.loop.create_task(send_delayed_message(member, delayed_message))
 
                 return  # 다음 동작을 방지하기 위해 리턴
-            
+
 @bot.event
 async def on_message(message):
     global delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS  # 삭제 기능 상태 및 금지어 관련 변수 전역 변수 사용
@@ -150,9 +137,12 @@ async def on_message(message):
 async def on_message_edit(before, after):
     global delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS  # 삭제 기능 상태 및 금지어 관련 변수 전역 변수 사용
 
-    # 금지어를 확인하고 처리합니다.
-    await check_and_handle_banned_words(after, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
+    # 수정된 메시지가 문자열이 아닌 경우에만 처리합니다.
+    if isinstance(after, discord.Message):
+        # 금지어를 확인하고 처리합니다.
+        await check_and_handle_banned_words(after, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
 
+# setup 함수 호출 후에 Slash 명령어 정의
 @slash.slash(name='add_word', description='금지어 목록에 단어 추가', options=[create_option(name='word', description='추가할 단어', option_type=3, required=True)])
 async def add_word(ctx: SlashContext, word: str):
     global banned_words
@@ -192,7 +182,7 @@ async def list_exception(ctx: SlashContext):
     else:
         await ctx.send('예외 단어가 없습니다.')
 
-@@slash.slash(name='add_user', description='검열 대상 유저 추가', options=[create_option(name='user_id', description='추가할 유저의 ID', option_type=6, required=True)])
+@slash.slash(name='add_user', description='검열 대상 유저 추가', options=[create_option(name='user_id', description='추가할 유저의 ID', option_type=6, required=True)])
 async def add_user(ctx: SlashContext, user_id: int):
     # 예외 처리를 추가합니다.
     try:
@@ -305,36 +295,18 @@ async def help_command(ctx: SlashContext):
         "`/add_user [유저ID]`: 검열 대상 목록에 유저를 추가합니다.\n"
         "`/remove_user [유저ID]`: 검열 대상 목록에서 유저를 제거합니다.\n"
         "`/list_users`: 검열 대상 목록을 표시합니다.\n"
-        "`/add_allow [유저ID]`: 커맨드 사용 권한을 부여합니다.\n"
-        "`/remove_allow [유저ID]`: 커맨드 사용 권한을 해제합니다.\n"
-        "`/list_allowed`: 커맨드 사용 권한이 부여된 유저 목록을 표시합니다.\n"
+        "`/add_allow [유저ID]`: 유저에게 명령어 사용 권한을 부여합니다.\n"
+        "`/remove_allow [유저ID]`: 유저의 명령어 사용 권한을 해제합니다.\n"
+        "`/list_allowed`: 명령어 사용 권한이 부여된 유저 목록을 표시합니다.\n"
         "`/shutdown`: 봇을 종료합니다.\n"
         "`/logout`: 봇을 임시 중단합니다.\n"
-        "`/restart`: 봇을 재시작합니다."
+        "`/restart`: 봇을 재시작합니다.\n"
+        "`/help`: 이 메시지를 표시합니다."
     )
     await ctx.send(help_message)
-
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CheckFailure):
-        # 해당 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 확인
-        if first_error_message_sent.get(ctx.author.id) is None:
-            # 플래그를 True로 설정
-            first_error_message_sent[ctx.author.id] = True
-            # 오류 메시지 전송
-            await ctx.send("님 권한 없음 ㅅㄱ")
-    elif isinstance(error, commands.CommandNotFound):
-        # CommandNotFound에 대한 오류 메시지 전송
-        # 해당 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 확인
-        if first_error_message_sent.get(ctx.author.id) is None:
-            # 플래그를 True로 설정
-            first_error_message_sent[ctx.author.id] = True
-            await ctx.send("님 명령어 잘못 적음")
-    else:
-        raise error
 
 async def main():
     await bot.start(TOKEN)
 
 if __name__ == "__main__":
-    bot.loop.run_until_complete(main())
+    asyncio.run(main())
