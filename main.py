@@ -45,6 +45,13 @@ def find_role(guild, role_name):
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
 
+async def send_delayed_message(member, content):
+    await asyncio.sleep(60 * 60)  # 60분
+    try:
+        await member.send(content)
+    except discord.errors.Forbidden:
+        pass  # DM이 차단되어 있는 경우 무시
+
 @bot.event
 async def on_ready():
     global slash
@@ -53,14 +60,6 @@ async def on_ready():
     if target_channel:
         await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다.')
     await slash.sync_all_commands() 
-
-
-async def send_delayed_message(member, content):
-    await asyncio.sleep(60 * 60)  # 60분
-    try:
-        await member.send(content)
-    except discord.errors.Forbidden:
-        pass  # DM이 차단되어 있는 경우 무시
 
 @bot.event
 async def on_shutdown():
