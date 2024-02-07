@@ -14,7 +14,7 @@ intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
-slash = None
+slash = SlashCommand(bot, sync_commands=True)
 
 # 내장된 도움말 명령어 비활성화
 bot.remove_command('help')
@@ -45,19 +45,14 @@ def find_role(guild, role_name):
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
 
-async def setup():
-    global slash
-    slash = SlashCommand(bot, sync_commands=True)
-    await bot.wait_until_ready()  # Wait until the bot is fully ready
-    await slash.sync_all_commands()  # Sync all commands here
-
 @bot.event
 async def on_ready():
+    global slash
     print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
     target_channel = bot.get_channel(target_channel_id)
     if target_channel:
         await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다.')
-    await setup()  # setup 함수를 호출하여 명령어를 등록합니다.
+    await slash.sync_all_commands() 
 
 
 async def send_delayed_message(member, content):
@@ -148,6 +143,7 @@ async def on_message_edit(before, after):
         # 금지어를 확인하고 처리합니다.
         await check_and_handle_banned_words(after, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
 
+# setup 함수 호출 후에 Slash 명령어 정의
 @slash.slash(name='add_word', description='금지어 목록에 단어 추가', options=[create_option(name='word', description='추가할 단어', option_type=3, required=True)])
 async def add_word(ctx: SlashContext, word: str):
     global banned_words
@@ -313,4 +309,5 @@ async def help_command(ctx: SlashContext):
 async def main():
     await bot.start(TOKEN)
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
