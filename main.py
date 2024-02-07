@@ -1,5 +1,6 @@
 import discord
-from discord.ext import commands
+from discord import Intents
+from discord.ext.commands import Bot
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.utils.manage_commands import create_option
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
@@ -13,8 +14,8 @@ intents.guilds = True
 intents.members = True
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
-slash = SlashCommand(bot, sync_commands=True)
+bot = Bot(command_prefix="!", self_bot=True, intents=Intents.default())
+slash = SlashCommand(bot)
 
 # 내장된 도움말 명령어 비활성화
 bot.remove_command('help')
@@ -57,6 +58,7 @@ async def on_ready():
     global slash
     print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
     target_channel = bot.get_channel(target_channel_id)
+
     if target_channel:
         await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다.')
     await slash.sync_all_commands() 
