@@ -1,8 +1,5 @@
 import discord
-from discord import Intents
-from discord.ext.commands import Bot
-from discord_slash import SlashCommand, SlashContext
-from discord_slash.utils.manage_commands import create_option
+from discord.ext import commands
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
 from data_management import save_data, load_data
 from datetime import datetime, timedelta
@@ -14,10 +11,7 @@ intents.guilds = True
 intents.members = True
 intents.message_content = True
 
-bot = Bot(command_prefix="!", self_bot=True, intents=Intents.default())
-slash = SlashCommand(bot)
-
-# 내장된 도움말 명령어 비활성화
+bot = commands.Bot(command_prefix="!", intents=intents)
 bot.remove_command('help')
 
 # 파일에서 데이터 로드
@@ -45,6 +39,20 @@ def find_role(guild, role_name):
 
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
+@bot.event
+async def on_ready():
+    print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
+    target_channel = bot.get_channel(target_channel_id)
+
+    if target_channel:
+        await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다.')
+
+# 봇이 종료될 때 메시지를 특정 채널에 보냅니다.
+@bot.event
+async def on_shutdown():
+    target_channel = bot.get_channel(target_channel_id)
+    if target_channel:
+        await target_channel.send(f'계엄령이 해제되었습니다.')
 
 async def send_delayed_message(member, content):
     await asyncio.sleep(60 * 60)  # 60분
@@ -54,16 +62,6 @@ async def send_delayed_message(member, content):
         pass  # DM이 차단되어 있는 경우 무시
 
 @bot.event
-async def on_ready():
-    global slash
-    print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
-    target_channel = bot.get_channel(target_channel_id)
-
-    if target_channel:
-        await target_channel.send(f'계엄사령부에서 알려드립니다. 계엄령이 선포되었습니다.')
-    await slash.sync_all_commands() 
-
-@bot.event
 async def on_shutdown():
     # 봇이 종료될 때 메시지를 특정 채널에 보냅니다.
     target_channel = bot.get_channel(target_channel_id)
@@ -71,7 +69,8 @@ async def on_shutdown():
         await target_channel.send(f'계엄령이 해제되었습니다.')
 
 # 메시지에 금지어가 포함되어 있는지 확인하고 처리하는 함수
-async def check_and_handle_banned_words(message, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS):
+async def check_and_handle_banned_words(message):
+    global delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS
     if message.author.id in target_users and delete_enabled:
         current_time = datetime.utcnow()
 
@@ -127,66 +126,61 @@ async def check_and_handle_banned_words(message, delete_enabled, first_deletion_
 
 @bot.event
 async def on_message(message):
-    global delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS  # 삭제 기능 상태 및 금지어 관련 변수 전역 변수 사용
-
     # 금지어를 확인하고 처리합니다.
-    await check_and_handle_banned_words(message, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
-
+    await check_and_handle_banned_words(message)
     await bot.process_commands(message)
 
 # 메시지 편집 이벤트
 @bot.event
 async def on_message_edit(before, after):
-    global delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS  # 삭제 기능 상태 및 금지어 관련 변수 전역 변수 사용
-
     # 수정된 메시지가 문자열이 아닌 경우에만 처리합니다.
     if isinstance(after, discord.Message):
         # 금지어를 확인하고 처리합니다.
-        await check_and_handle_banned_words(after, delete_enabled, first_deletion_time, banned_words, exception_words, target_users, TARGET_ROLE_IDS)
+        await check_and_handle_banned_words(after)
 
-# setup 함수 호출 후에 Slash 명령어 정의
-@slash.slash(name='add_word', description='금지어 목록에 단어 추가', options=[create_option(name='word', description='추가할 단어', option_type=3, required=True)])
-async def add_word(ctx: SlashContext, word: str):
+@bot.command()
+async def add_word(ctx, word: str):
     global banned_words
     banned_words.add(word.lower())
     save_data({'banned_words': list(banned_words)})
     await ctx.send(f'이제 님들 "{word}"도 못 씀')
 
-@slash.slash(name='remove_word', description='금지어 목록에서 단어 제거', options=[create_option(name='word', description='제거할 단어', option_type=3, required=True)])
-async def remove_word(ctx: SlashContext, word: str):
+@bot.command()
+async def remove_word(ctx, word: str):
     global banned_words
     banned_words.discard(word.lower())
     save_data({'banned_words': list(banned_words)})
     await ctx.send(f'"{word}"은(는) 쓰십쇼')
 
-@slash.slash(name='list_words', description='금지어 목록 표시')
-async def list_words(ctx: SlashContext):
+@bot.command()
+async def list_words(ctx):
     await ctx.send(f'금지어 목록: {", ".join(banned_words)}')
-
-@slash.slash(name='add_exception', description='예외 단어 추가', options=[create_option(name='word', description='추가할 예외 단어', option_type=3, required=True)])
-async def add_exception(ctx: SlashContext, word: str):
+@bot.command()
+async def add_exception(ctx, word: str):
     global exception_words
     exception_words.add(word.lower())
     save_data({'exception_words': list(exception_words)})
     await ctx.send(f'예외 단어 "{word}" 추가해드림')
 
-@slash.slash(name='remove_exception', description='예외 단어 제거', options=[create_option(name='word', description='제거할 예외 단어', option_type=3, required=True)])
-async def remove_exception(ctx: SlashContext, word: str):
+# "/remove_exception" 명령어 정의
+@bot.command()
+async def remove_exception(ctx, word: str):
     global exception_words
     exception_words.discard(word.lower())
     save_data({'exception_words': list(exception_words)})
     await ctx.send(f'"{word}"이것도 이제 예외 아님')
 
-@slash.slash(name='list_exception', description='예외 단어 목록 표시')
-async def list_exception(ctx: SlashContext):
+# "/list_exception" 명령어 정의
+@bot.command()
+async def list_exception(ctx):
     if exception_words:
         await ctx.send(f'예외 단어 목록: {", ".join(exception_words)}')
     else:
         await ctx.send('예외 단어가 없습니다.')
 
-@slash.slash(name='add_user', description='검열 대상 유저 추가', options=[create_option(name='user_id', description='추가할 유저의 ID', option_type=6, required=True)])
-async def add_user(ctx: SlashContext, user_id: int):
-    # 예외 처리를 추가합니다.
+# "/add_user" 명령어 정의
+@bot.command()
+async def add_user(ctx, user_id: int):
     try:
         member = await ctx.guild.fetch_member(user_id)
         target_users.add(user_id)
@@ -194,31 +188,30 @@ async def add_user(ctx: SlashContext, user_id: int):
     except discord.NotFound:
         await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
 
-@slash.slash(name='remove_user', description='검열 대상 목록에서 유저 제거', options=[create_option(name='user_id', description='제거할 유저 ID', option_type=3, required=True)])
-async def remove_user(ctx: SlashContext, user_id: int):
+# "/remove_user" 명령어 정의
+@bot.command()
+async def remove_user(ctx, user_id: int):
     global target_users
     try:
         target_users.remove(user_id)
         save_data({'target_users': list(target_users)})
         member = ctx.guild.get_member(user_id)
         await ctx.send(f'{member.mention}님 석방임 ㅊㅊ')
-        if first_error_message_sent.get(user_id) is None:
-            first_error_message_sent[user_id] = True
     except ValueError:
         await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
-@slash.slash(name='list_users', description='검열 대상 유저 목록 표시')
-async def list_users(ctx: SlashContext):
-    # 예외 처리를 추가합니다.
+# "/list_users" 명령어 정의
+@bot.command()
+async def list_users(ctx):
     if target_users:
         user_mentions = [f'<@{user_id}>' for user_id in target_users]
         await ctx.send(f'검열 대상 유저 목록: {", ".join(user_mentions)}')
     else:
         await ctx.send('검열 대상 유저가 없습니다.')
 
-@slash.slash(name='add_allow', description='유저에게 명령어 사용 권한 부여', options=[create_option(name='user_id', description='권한을 부여할 유저 ID', option_type=3, required=True)])
-async def add_allow(ctx: SlashContext, user_id: int):
-    global allowed_command_users
+# "/add_allow" 명령어 정의
+@bot.command()
+async def add_allow(ctx, user_id: int):
     member = ctx.guild.get_member(user_id)
     if member:
         allowed_command_users.add(user_id)
@@ -228,27 +221,24 @@ async def add_allow(ctx: SlashContext, user_id: int):
     else:
         await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
 
-@slash.slash(name='remove_allow', description='유저의 명령어 사용 권한 해제', options=[create_option(name='user_id', description='권한을 해제할 유저 ID', option_type=3, required=True)])
-async def remove_allow(ctx: SlashContext, user_id: int):
-    global allowed_command_users
-    member = ctx.guild.get_member(user_id)
-    if member:
-        if user_id in allowed_command_users:
-            allowed_command_users.remove(user_id)
-            save_data({'allowed_command_users': list(allowed_command_users)})
-            user_mention = member.mention
-            await ctx.send(f'{user_mention}님 커맨드 권한 해제요.')
-        else:
-            await ctx.send(f'{user_id}에 해당하는 사용자가 권한 목록에 존재하지 않습니다.')
+# "/remove_allow" 명령어 정의
+@bot.command()
+async def remove_allow(ctx, user_id: int):
+    if user_id in allowed_command_users:
+        allowed_command_users.remove(user_id)
+        save_data({'allowed_command_users': list(allowed_command_users)})
+        await ctx.send(f'<@{user_id}>님 커맨드 권한 해제요.')
     else:
-        await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
+        await ctx.send(f'{user_id}에 해당하는 사용자가 권한 목록에 존재하지 않습니다.')
 
-@slash.slash(name='list_allowed', description='명령어 사용 권한 부여된 유저 목록 표시')
-async def list_allowed(ctx: SlashContext):
+# "/list_allowed" 명령어 정의
+@bot.command()
+async def list_allowed(ctx):
     await ctx.send(f'명령어 사용 권한이 부여된 유저 목록: {", ".join(str(user_id) for user_id in allowed_command_users)}')
 
-@slash.slash(name='shutdown', description='봇 종료')
-async def shutdown(ctx: SlashContext):
+# "/shutdown" 명령어 정의
+@bot.command()
+async def shutdown(ctx):
     global delete_enabled, logout_done, restart_done
     delete_enabled = False
     logout_done = True
@@ -256,8 +246,9 @@ async def shutdown(ctx: SlashContext):
     await ctx.send('계엄령이 해제되었습니다.')
     await bot.close()
 
-@slash.slash(name='logout', description='봇 임시 중단')
-async def logout(ctx: SlashContext):
+# "/logout" 명령어 정의
+@bot.command()
+async def logout(ctx):
     global delete_enabled, logout_done, restart_done
     if not logout_done:
         delete_enabled = False
@@ -268,8 +259,9 @@ async def logout(ctx: SlashContext):
     else:
         await ctx.send('이미 로그아웃이 수행되었습니다.')
 
-@slash.slash(name='restart', description='봇 재시작')
-async def restart(ctx: SlashContext):
+# "/restart" 명령어 정의
+@bot.command()
+async def restart(ctx):
     global delete_enabled, logout_done, restart_done
     if not restart_done:
         delete_enabled = True
@@ -280,8 +272,8 @@ async def restart(ctx: SlashContext):
     else:
         await ctx.send('이미 재시작이 수행되었습니다.')
 
-@slash.slash(name='help', description='사용 가능한 명령어 및 설명 표시')
-async def help_command(ctx: SlashContext):
+@bot.command(name='help', description='사용 가능한 명령어 및 설명 표시')
+async def help_command(ctx):
     """
     봇의 사용 가능한 명령어와 간단한 설명을 표시합니다.
     """
@@ -307,8 +299,4 @@ async def help_command(ctx: SlashContext):
     )
     await ctx.send(help_message)
 
-async def main():
-    await bot.start(TOKEN)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+bot.run(TOKEN)
