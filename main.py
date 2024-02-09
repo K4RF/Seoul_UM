@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.ext.commands import Context
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
 from data_management import save_data, load_data
 from datetime import datetime, timedelta
@@ -13,6 +14,7 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 bot.remove_command('help')
+sync_command=True
 
 # 파일에서 데이터 로드
 data = load_data()
@@ -138,40 +140,40 @@ async def on_message_edit(before, after):
         # 금지어를 확인하고 처리합니다.
         await check_and_handle_banned_words(after)
 
-@bot.command()
-async def add_word(ctx, word: str):
+@bot.command(name='add_word', description='금지어 목록에 단어 추가')
+async def add_word(ctx: Context, word: str):
     global banned_words
     banned_words.add(word.lower())
     save_data({'banned_words': list(banned_words)})
     await ctx.send(f'이제 님들 "{word}"도 못 씀')
 
-@bot.command()
-async def remove_word(ctx, word: str):
+@bot.command(name='remove_word', description='금지어 목록에서 단어 제거')
+async def remove_word(ctx: Context, word: str):
     global banned_words
     banned_words.discard(word.lower())
     save_data({'banned_words': list(banned_words)})
     await ctx.send(f'"{word}"은(는) 쓰십쇼')
 
-@bot.command()
+@bot.command(name='list_words', description='금지어 목록 표시')
 async def list_words(ctx):
     await ctx.send(f'금지어 목록: {", ".join(banned_words)}')
-@bot.command()
-async def add_exception(ctx, word: str):
+@bot.command(name='add_exception', description='예외 단어 추가')
+async def add_exception(ctx: Context, word: str):
     global exception_words
     exception_words.add(word.lower())
     save_data({'exception_words': list(exception_words)})
     await ctx.send(f'예외 단어 "{word}" 추가해드림')
 
 # "/remove_exception" 명령어 정의
-@bot.command()
-async def remove_exception(ctx, word: str):
+@bot.command(name='remove_exception', description='예외 단어 제거')
+async def remove_exception(ctx: Context, word: str):
     global exception_words
     exception_words.discard(word.lower())
     save_data({'exception_words': list(exception_words)})
     await ctx.send(f'"{word}"이것도 이제 예외 아님')
 
 # "/list_exception" 명령어 정의
-@bot.command()
+@bot.command(name='list_exception', description='예외 단어 목록 표시')
 async def list_exception(ctx):
     if exception_words:
         await ctx.send(f'예외 단어 목록: {", ".join(exception_words)}')
@@ -179,8 +181,8 @@ async def list_exception(ctx):
         await ctx.send('예외 단어가 없습니다.')
 
 # "/add_user" 명령어 정의
-@bot.command()
-async def add_user(ctx, user_id: int):
+@bot.command(name='add_user', description='검열 대상 유저 추가')
+async def add_user(ctx: Context, user_id: int):
     try:
         member = await ctx.guild.fetch_member(user_id)
         target_users.add(user_id)
@@ -189,8 +191,8 @@ async def add_user(ctx, user_id: int):
         await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
 
 # "/remove_user" 명령어 정의
-@bot.command()
-async def remove_user(ctx, user_id: int):
+@bot.command(name='remove_user', description='검열 대상 목록에서 유저 제거')
+async def remove_user(ctx: Context, user_id: int):
     global target_users
     try:
         target_users.remove(user_id)
@@ -201,7 +203,7 @@ async def remove_user(ctx, user_id: int):
         await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
 # "/list_users" 명령어 정의
-@bot.command()
+@bot.command(name='list_users', description='검열 대상 유저 목록 표시')
 async def list_users(ctx):
     if target_users:
         user_mentions = [f'<@{user_id}>' for user_id in target_users]
@@ -210,8 +212,8 @@ async def list_users(ctx):
         await ctx.send('검열 대상 유저가 없습니다.')
 
 # "/add_allow" 명령어 정의
-@bot.command()
-async def add_allow(ctx, user_id: int):
+@bot.command(name='add_allow', description='유저에게 명령어 사용 권한 부여')
+async def add_allow(ctx: Context, user_id: int):
     member = ctx.guild.get_member(user_id)
     if member:
         allowed_command_users.add(user_id)
@@ -222,8 +224,8 @@ async def add_allow(ctx, user_id: int):
         await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
 
 # "/remove_allow" 명령어 정의
-@bot.command()
-async def remove_allow(ctx, user_id: int):
+@bot.command(name='remove_allow', description='유저의 명령어 사용 권한 해제')
+async def remove_allow(ctx: Context, user_id: int):
     if user_id in allowed_command_users:
         allowed_command_users.remove(user_id)
         save_data({'allowed_command_users': list(allowed_command_users)})
@@ -232,12 +234,12 @@ async def remove_allow(ctx, user_id: int):
         await ctx.send(f'{user_id}에 해당하는 사용자가 권한 목록에 존재하지 않습니다.')
 
 # "/list_allowed" 명령어 정의
-@bot.command()
+@bot.command(name='list_allowed', description='명령어 사용 권한 부여된 유저 목록 표시')
 async def list_allowed(ctx):
     await ctx.send(f'명령어 사용 권한이 부여된 유저 목록: {", ".join(str(user_id) for user_id in allowed_command_users)}')
 
 # "/shutdown" 명령어 정의
-@bot.command()
+@bot.command(name='shutdown', description='봇 종료')
 async def shutdown(ctx):
     global delete_enabled, logout_done, restart_done
     delete_enabled = False
@@ -247,7 +249,7 @@ async def shutdown(ctx):
     await bot.close()
 
 # "/logout" 명령어 정의
-@bot.command()
+@bot.command(name='logout', description='봇 임시 중단')
 async def logout(ctx):
     global delete_enabled, logout_done, restart_done
     if not logout_done:
@@ -260,7 +262,7 @@ async def logout(ctx):
         await ctx.send('이미 로그아웃이 수행되었습니다.')
 
 # "/restart" 명령어 정의
-@bot.command()
+@bot.command(name='restart', description='봇 재시작')
 async def restart(ctx):
     global delete_enabled, logout_done, restart_done
     if not restart_done:
@@ -273,7 +275,7 @@ async def restart(ctx):
         await ctx.send('이미 재시작이 수행되었습니다.')
 
 @bot.command(name='help', description='사용 가능한 명령어 및 설명 표시')
-async def help_command(ctx):
+async def help(ctx):
     """
     봇의 사용 가능한 명령어와 간단한 설명을 표시합니다.
     """
