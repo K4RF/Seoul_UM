@@ -39,6 +39,10 @@ restart_done = False
 def find_role(guild, role_name):
     return discord.utils.get(guild.roles, name=role_name)
 
+# Define a decorator to check if the command invoker is allowed
+def is_allowed(ctx):
+    return ctx.author.id in allowed_command_users
+
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
 @bot.event
@@ -141,6 +145,7 @@ async def on_message_edit(before, after):
         await check_and_handle_banned_words(after)
 
 @bot.command(name='add_word', description='금지어 목록에 단어 추가')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_word(ctx: Context, word: str):
     global banned_words
     banned_words.add(word.lower())
@@ -148,6 +153,7 @@ async def add_word(ctx: Context, word: str):
     await ctx.send(f'이제 님들 "{word}"도 못 씀')
 
 @bot.command(name='remove_word', description='금지어 목록에서 단어 제거')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_word(ctx: Context, word: str):
     global banned_words
     banned_words.discard(word.lower())
@@ -158,6 +164,7 @@ async def remove_word(ctx: Context, word: str):
 async def list_words(ctx):
     await ctx.send(f'금지어 목록: {", ".join(banned_words)}')
 @bot.command(name='add_exception', description='예외 단어 추가')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_exception(ctx: Context, word: str):
     global exception_words
     exception_words.add(word.lower())
@@ -166,6 +173,7 @@ async def add_exception(ctx: Context, word: str):
 
 # "/remove_exception" 명령어 정의
 @bot.command(name='remove_exception', description='예외 단어 제거')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_exception(ctx: Context, word: str):
     global exception_words
     exception_words.discard(word.lower())
@@ -182,6 +190,7 @@ async def list_exception(ctx):
 
 # "/add_user" 명령어 정의
 @bot.command(name='add_user', description='검열 대상 유저 추가')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_user(ctx: Context, user_id: int):
     try:
         member = await ctx.guild.fetch_member(user_id)
@@ -192,6 +201,7 @@ async def add_user(ctx: Context, user_id: int):
 
 # "/remove_user" 명령어 정의
 @bot.command(name='remove_user', description='검열 대상 목록에서 유저 제거')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_user(ctx: Context, user_id: int):
     global target_users
     try:
@@ -213,6 +223,7 @@ async def list_users(ctx):
 
 # "/add_allow" 명령어 정의
 @bot.command(name='add_allow', description='유저에게 명령어 사용 권한 부여')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def add_allow(ctx: Context, user_id: int):
     member = ctx.guild.get_member(user_id)
     if member:
@@ -225,6 +236,7 @@ async def add_allow(ctx: Context, user_id: int):
 
 # "/remove_allow" 명령어 정의
 @bot.command(name='remove_allow', description='유저의 명령어 사용 권한 해제')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def remove_allow(ctx: Context, user_id: int):
     if user_id in allowed_command_users:
         allowed_command_users.remove(user_id)
@@ -240,6 +252,7 @@ async def list_allowed(ctx):
 
 # "/shutdown" 명령어 정의
 @bot.command(name='shutdown', description='봇 종료')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def shutdown(ctx):
     global delete_enabled, logout_done, restart_done
     delete_enabled = False
@@ -250,6 +263,7 @@ async def shutdown(ctx):
 
 # "/logout" 명령어 정의
 @bot.command(name='logout', description='봇 임시 중단')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def logout(ctx):
     global delete_enabled, logout_done, restart_done
     if not logout_done:
@@ -263,6 +277,7 @@ async def logout(ctx):
 
 # "/restart" 명령어 정의
 @bot.command(name='restart', description='봇 재시작')
+@commands.check(is_allowed)  # Check if the invoker is allowed
 async def restart(ctx):
     global delete_enabled, logout_done, restart_done
     if not restart_done:
@@ -300,5 +315,24 @@ async def help(ctx):
         "`/help`: 이 메시지를 표시합니다."
     )
     await ctx.send(help_message)
+    
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        # Check if the first error message has been sent for this member
+        if first_error_message_sent.get(ctx.author.id) is None:
+            # Set the flag to True
+            first_error_message_sent[ctx.author.id] = True
+            # Send the error message
+            await ctx.send("님 권한 없음 ㅅㄱ")
+    elif isinstance(error, commands.CommandNotFound):
+        # Send the error message for CommandNotFound
+        # Check if the first error message has been sent for this member
+        if first_error_message_sent.get(ctx.author.id) is None:
+            # Set the flag to True
+            first_error_message_sent[ctx.author.id] = True
+            await ctx.send("님 명령어 잘못 적음")
+    else:
+        raise error
 
 bot.run(TOKEN)
