@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
@@ -39,9 +40,8 @@ restart_done = False
 def find_role(guild, role_name):
     return discord.utils.get(guild.roles, name=role_name)
 
-# Define a decorator to check if the command invoker is allowed
-def is_allowed(ctx):
-    return ctx.author.id in allowed_command_users
+def is_allowed(interaction):
+    return interaction.author.id in allowed_command_users
 
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
@@ -144,153 +144,151 @@ async def on_message_edit(before, after):
         # 금지어를 확인하고 처리합니다.
         await check_and_handle_banned_words(after)
 
-@bot.command(name='add_word', description='금지어 목록에 단어 추가')
+@bot.tree.command(name='add_word', description='금지어 목록에 단어 추가')
+@app_commands.describe(word='금지어')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_word(ctx: Context, word: str):
+async def add_word(interaction: discord.Interaction, word: str):
     global banned_words
     banned_words.add(word.lower())
     save_data({'banned_words': list(banned_words)})
-    await ctx.send(f'이제 님들 "{word}"도 못 씀')
+    await interaction.response.send_message(f'이제 님들 "{word}"도 못 씀')
 
-@bot.command(name='remove_word', description='금지어 목록에서 단어 제거')
+@bot.tree.command(name='remove_word', description='금지어 목록에서 단어 제거')
+@app_commands.describe(word='금지어')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_word(ctx: Context, word: str):
+async def remove_word(interaction: discord.Interaction, word: str):
     global banned_words
     banned_words.discard(word.lower())
     save_data({'banned_words': list(banned_words)})
-    await ctx.send(f'"{word}"은(는) 쓰십쇼')
+    await interaction.response.send_message(f'"{word}"은(는) 쓰십쇼')
 
-@bot.command(name='list_words', description='금지어 목록 표시')
-async def list_words(ctx):
-    await ctx.send(f'금지어 목록: {", ".join(banned_words)}')
-@bot.command(name='add_exception', description='예외 단어 추가')
+@bot.tree.command(name='list_words', description='금지어 목록 표시')
+async def list_words(interaction: discord.Interaction):
+    await interaction.response.send_message(f'금지어 목록: {", ".join(banned_words)}')
+
+@bot.tree.command(name='add_exception', description='예외 단어 추가')
+@app_commands.describe(word='예외 단어')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_exception(ctx: Context, word: str):
+async def add_exception(interaction: discord.Interaction, word: str):
     global exception_words
     exception_words.add(word.lower())
     save_data({'exception_words': list(exception_words)})
-    await ctx.send(f'예외 단어 "{word}" 추가해드림')
+    await interaction.response.send_message(f'예외 단어 "{word}" 추가해드림')
 
-# "/remove_exception" 명령어 정의
-@bot.command(name='remove_exception', description='예외 단어 제거')
+@bot.tree.command(name='remove_exception', description='예외 단어 제거')
+@app_commands.describe(word='예외 단어')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_exception(ctx: Context, word: str):
+async def remove_exception(interaction: discord.Interaction, word: str):
     global exception_words
     exception_words.discard(word.lower())
     save_data({'exception_words': list(exception_words)})
-    await ctx.send(f'"{word}"이것도 이제 예외 아님')
+    await interaction.response.send_message(f'"{word}"이것도 이제 예외 아님')
 
-# "/list_exception" 명령어 정의
-@bot.command(name='list_exception', description='예외 단어 목록 표시')
-async def list_exception(ctx):
+@bot.tree.command(name='list_exception', description='예외 단어 목록 표시')
+async def list_exception(interaction: discord.Interaction):
     if exception_words:
-        await ctx.send(f'예외 단어 목록: {", ".join(exception_words)}')
+        await interaction.response.send_message(f'예외 단어 목록: {", ".join(exception_words)}')
     else:
-        await ctx.send('예외 단어가 없습니다.')
+        await interaction.response.send_message('예외 단어가 없습니다.')
 
-# "/add_user" 명령어 정의
-@bot.command(name='add_user', description='검열 대상 유저 추가')
+@bot.tree.command(name='add_user', description='검열 대상 유저 추가')
+@app_commands.describe(user_id='추가할 유저의 ID')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_user(ctx: Context, user_id: int):
+async def add_user(interaction: discord.Interaction, user_id: int):
     try:
-        member = await ctx.guild.fetch_member(user_id)
+        member = await interaction.guild.fetch_member(user_id)
         target_users.add(user_id)
-        await ctx.send(f'{member.display_name}님이 검열 대상 유저로 추가되었습니다.')
+        await interaction.response.send_message(f'{member.display_name}님이 검열 대상 유저로 추가되었습니다.')
     except discord.NotFound:
-        await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
+        await interaction.response.send_message(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
 
-# "/remove_user" 명령어 정의
-@bot.command(name='remove_user', description='검열 대상 목록에서 유저 제거')
+@bot.tree.command(name='remove_user', description='검열 대상 목록에서 유저 제거')
+@app_commands.describe(user_id='제거할 유저의 ID')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_user(ctx: Context, user_id: int):
+async def remove_user(interaction: discord.Interaction, user_id: int):
     global target_users
     try:
         target_users.remove(user_id)
         save_data({'target_users': list(target_users)})
-        member = ctx.guild.get_member(user_id)
-        await ctx.send(f'{member.mention}님 석방임 ㅊㅊ')
+        member = interaction.guild.get_member(user_id)
+        await interaction.response.send_message(f'{member.mention}님 석방임 ㅊㅊ')
     except ValueError:
-        await ctx.send(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
+        await interaction.response.send_message(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
-# "/list_users" 명령어 정의
-@bot.command(name='list_users', description='검열 대상 유저 목록 표시')
-async def list_users(ctx):
+@bot.tree.command(name='list_users', description='검열 대상 유저 목록 표시')
+async def list_users(interaction: discord.Interaction):
     if target_users:
         user_mentions = [f'<@{user_id}>' for user_id in target_users]
-        await ctx.send(f'검열 대상 유저 목록: {", ".join(user_mentions)}')
+        await interaction.response.send_message(f'검열 대상 유저 목록: {", ".join(user_mentions)}')
     else:
-        await ctx.send('검열 대상 유저가 없습니다.')
+        await interaction.response.send_message('검열 대상 유저가 없습니다.')
 
-# "/add_allow" 명령어 정의
-@bot.command(name='add_allow', description='유저에게 명령어 사용 권한 부여')
+@bot.tree.command(name='add_allow', description='유저에게 명령어 사용 권한 부여')
+@app_commands.describe(user_id='명령어 사용 권한을 부여할 유저의 ID')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def add_allow(ctx: Context, user_id: int):
-    member = ctx.guild.get_member(user_id)
-    if member:
+async def add_allow(interaction: discord.Interaction, user_id: int):
+    try:
+        member = await interaction.guild.fetch_member(user_id)
         allowed_command_users.add(user_id)
         save_data({'allowed_command_users': list(allowed_command_users)})
         user_mention = member.mention
-        await ctx.send(f'{user_mention}님 커맨드 쓰십쇼.')
-    else:
-        await ctx.send(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
+        await interaction.response.send_message(f'{user_mention}님 커맨드 쓰십쇼.')
+    except discord.NotFound:
+        await interaction.response.send_message(f'서버 멤버 목록에 {user_id}에 해당하는 사용자가 없습니다.')
 
-# "/remove_allow" 명령어 정의
-@bot.command(name='remove_allow', description='유저의 명령어 사용 권한 해제')
+@bot.tree.command(name='remove_allow', description='유저의 명령어 사용 권한 해제')
+@app_commands.describe(user_id='명령어 사용 권한을 해제할 유저의 ID')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def remove_allow(ctx: Context, user_id: int):
+async def remove_allow(interaction: discord.Interaction, user_id: int):
     if user_id in allowed_command_users:
         allowed_command_users.remove(user_id)
         save_data({'allowed_command_users': list(allowed_command_users)})
-        await ctx.send(f'<@{user_id}>님 커맨드 권한 해제요.')
+        await interaction.response.send_message(f'<@{user_id}>님 커맨드 권한 해제요.')
     else:
-        await ctx.send(f'{user_id}에 해당하는 사용자가 권한 목록에 존재하지 않습니다.')
+        await interaction.response.send_message(f'{user_id}에 해당하는 사용자가 권한 목록에 존재하지 않습니다.')
 
-# "/list_allowed" 명령어 정의
-@bot.command(name='list_allowed', description='명령어 사용 권한 부여된 유저 목록 표시')
-async def list_allowed(ctx):
-    await ctx.send(f'명령어 사용 권한이 부여된 유저 목록: {", ".join(str(user_id) for user_id in allowed_command_users)}')
+@bot.tree.command(name='list_allowed', description='명령어 사용 권한 부여된 유저 목록 표시')
+async def list_allowed(interaction: discord.Interaction):
+    await interaction.response.send_message(f'명령어 사용 권한이 부여된 유저 목록: {", ".join(str(user_id) for user_id in allowed_command_users)}')
 
-# "/shutdown" 명령어 정의
-@bot.command(name='shutdown', description='봇 종료')
+@bot.tree.command(name='shutdown', description='봇 종료')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def shutdown(ctx):
+async def shutdown(interaction: discord.Interaction):
     global delete_enabled, logout_done, restart_done
     delete_enabled = False
     logout_done = True
     restart_done = True
-    await ctx.send('계엄령이 해제되었습니다.')
+    await interaction.response.send_message('계엄령이 해제되었습니다.')
     await bot.close()
 
-# "/logout" 명령어 정의
-@bot.command(name='logout', description='봇 임시 중단')
+@bot.tree.command(name='logout', description='봇 임시 중단')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def logout(ctx):
+async def logout(interaction: discord.Interaction):
     global delete_enabled, logout_done, restart_done
     if not logout_done:
         delete_enabled = False
         logout_done = True
         restart_done = False
-        await ctx.send('계엄령이 임시 해제되었습니다')
+        await interaction.response.send_message('계엄령이 임시 해제되었습니다')
         await bot.change_presence(status=discord.Status.idle)
     else:
-        await ctx.send('이미 로그아웃이 수행되었습니다.')
+        await interaction.response.send_message('이미 로그아웃이 수행되었습니다.')
 
-# "/restart" 명령어 정의
-@bot.command(name='restart', description='봇 재시작')
+@bot.tree.command(name='restart', description='봇 재시작')
 @commands.check(is_allowed)  # Check if the invoker is allowed
-async def restart(ctx):
+async def restart(interaction: discord.Interaction):
     global delete_enabled, logout_done, restart_done
     if not restart_done:
         delete_enabled = True
         restart_done = True
         logout_done = False
         await bot.change_presence(status=discord.Status.online)
-        await ctx.send('계엄령을 재선포합니다.')
+        await interaction.response.send_message('계엄령을 재선포합니다.')
     else:
-        await ctx.send('이미 재시작이 수행되었습니다.')
+        await interaction.response.send_message('이미 재시작이 수행되었습니다.')
 
-@bot.command(name='help', description='사용 가능한 명령어 및 설명 표시')
-async def help(ctx):
+@bot.tree.command(name='help', description='사용 가능한 명령어 및 설명 표시')
+async def help(interaction: discord.Interaction):
     """
     봇의 사용 가능한 명령어와 간단한 설명을 표시합니다.
     """
@@ -314,24 +312,25 @@ async def help(ctx):
         "`/restart`: 봇을 재시작합니다.\n"
         "`/help`: 이 메시지를 표시합니다."
     )
-    await ctx.send(help_message)
-    
+    await interaction.response.send_message(help_message)
+
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(interaction: discord.Interaction, error):
     if isinstance(error, commands.CheckFailure):
         # Check if the first error message has been sent for this member
-        if first_error_message_sent.get(ctx.author.id) is None:
+        if first_error_message_sent.get(interaction.author.id) is None:
             # Set the flag to True
-            first_error_message_sent[ctx.author.id] = True
-            # Send the error message
-            await ctx.send("님 권한 없음 ㅅㄱ")
+            first_error_message_sent[interaction.author.id] = True
+            # Send the error message using interaction
+            await interaction.response.send_message("님 권한없음 ㅅㄱ.")
     elif isinstance(error, commands.CommandNotFound):
         # Send the error message for CommandNotFound
         # Check if the first error message has been sent for this member
-        if first_error_message_sent.get(ctx.author.id) is None:
+        if first_error_message_sent.get(interaction.author.id) is None:
             # Set the flag to True
-            first_error_message_sent[ctx.author.id] = True
-            await ctx.send("님 명령어 잘못 적음")
+            first_error_message_sent[interaction.author.id] = True
+            # Send the error message using interaction
+            await interaction.response.send_message("님 명령어 잘못씀.")
     else:
         raise error
 
