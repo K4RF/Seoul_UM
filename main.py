@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ext.commands import Context
+from discord.ext.commands import check
 from config import TOKEN, TARGET_WORDS, EXCEPTION_WORDS, TARGET_USERS, TARGET_ROLE_IDS, target_channel_id, ALLOWED_USERS
 from data_management import save_data, load_data
 from datetime import datetime, timedelta
@@ -40,8 +40,9 @@ restart_done = False
 def find_role(guild, role_name):
     return discord.utils.get(guild.roles, name=role_name)
 
-def is_allowed(interaction):
-    return interaction.author.id in allowed_command_users
+# 사용자가 허가된 사용자인지 확인하는 함수
+def is_allowed_user(ctx):
+    return ctx.author.id in allowed_command_users
 
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
@@ -146,7 +147,7 @@ async def on_message_edit(before, after):
 
 @bot.tree.command(name='add_word', description='금지어 목록에 단어 추가')
 @app_commands.describe(word='금지어')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def add_word(interaction: discord.Interaction, word: str):
     global banned_words
     banned_words.add(word.lower())
@@ -155,7 +156,7 @@ async def add_word(interaction: discord.Interaction, word: str):
 
 @bot.tree.command(name='remove_word', description='금지어 목록에서 단어 제거')
 @app_commands.describe(word='금지어')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def remove_word(interaction: discord.Interaction, word: str):
     global banned_words
     banned_words.discard(word.lower())
@@ -163,12 +164,13 @@ async def remove_word(interaction: discord.Interaction, word: str):
     await interaction.response.send_message(f'"{word}"은(는) 쓰십쇼')
 
 @bot.tree.command(name='list_words', description='금지어 목록 표시')
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def list_words(interaction: discord.Interaction):
     await interaction.response.send_message(f'금지어 목록: {", ".join(banned_words)}')
 
 @bot.tree.command(name='add_exception', description='예외 단어 추가')
 @app_commands.describe(word='예외 단어')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def add_exception(interaction: discord.Interaction, word: str):
     global exception_words
     exception_words.add(word.lower())
@@ -177,7 +179,7 @@ async def add_exception(interaction: discord.Interaction, word: str):
 
 @bot.tree.command(name='remove_exception', description='예외 단어 제거')
 @app_commands.describe(word='예외 단어')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def remove_exception(interaction: discord.Interaction, word: str):
     global exception_words
     exception_words.discard(word.lower())
@@ -185,6 +187,7 @@ async def remove_exception(interaction: discord.Interaction, word: str):
     await interaction.response.send_message(f'"{word}"이것도 이제 예외 아님')
 
 @bot.tree.command(name='list_exception', description='예외 단어 목록 표시')
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def list_exception(interaction: discord.Interaction):
     if exception_words:
         await interaction.response.send_message(f'예외 단어 목록: {", ".join(exception_words)}')
@@ -193,7 +196,7 @@ async def list_exception(interaction: discord.Interaction):
 
 @bot.tree.command(name='add_user', description='검열 대상 유저 추가')
 @app_commands.describe(user_id='추가할 유저의 ID')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def add_user(interaction: discord.Interaction, user_id: int):
     try:
         member = await interaction.guild.fetch_member(user_id)
@@ -204,7 +207,7 @@ async def add_user(interaction: discord.Interaction, user_id: int):
 
 @bot.tree.command(name='remove_user', description='검열 대상 목록에서 유저 제거')
 @app_commands.describe(user_id='제거할 유저의 ID')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def remove_user(interaction: discord.Interaction, user_id: int):
     global target_users
     try:
@@ -216,6 +219,7 @@ async def remove_user(interaction: discord.Interaction, user_id: int):
         await interaction.response.send_message(f'사용자 {user_id}가 검열 대상 목록에 존재하지 않음')
 
 @bot.tree.command(name='list_users', description='검열 대상 유저 목록 표시')
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def list_users(interaction: discord.Interaction):
     if target_users:
         user_mentions = [f'<@{user_id}>' for user_id in target_users]
@@ -225,7 +229,7 @@ async def list_users(interaction: discord.Interaction):
 
 @bot.tree.command(name='add_allow', description='유저에게 명령어 사용 권한 부여')
 @app_commands.describe(user_id='명령어 사용 권한을 부여할 유저의 ID')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def add_allow(interaction: discord.Interaction, user_id: int):
     try:
         member = await interaction.guild.fetch_member(user_id)
@@ -238,7 +242,7 @@ async def add_allow(interaction: discord.Interaction, user_id: int):
 
 @bot.tree.command(name='remove_allow', description='유저의 명령어 사용 권한 해제')
 @app_commands.describe(user_id='명령어 사용 권한을 해제할 유저의 ID')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def remove_allow(interaction: discord.Interaction, user_id: int):
     if user_id in allowed_command_users:
         allowed_command_users.remove(user_id)
@@ -248,11 +252,12 @@ async def remove_allow(interaction: discord.Interaction, user_id: int):
         await interaction.response.send_message(f'{user_id}에 해당하는 사용자가 권한 목록에 존재하지 않습니다.')
 
 @bot.tree.command(name='list_allowed', description='명령어 사용 권한 부여된 유저 목록 표시')
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def list_allowed(interaction: discord.Interaction):
     await interaction.response.send_message(f'명령어 사용 권한이 부여된 유저 목록: {", ".join(str(user_id) for user_id in allowed_command_users)}')
 
 @bot.tree.command(name='shutdown', description='봇 종료')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def shutdown(interaction: discord.Interaction):
     global delete_enabled, logout_done, restart_done
     delete_enabled = False
@@ -262,7 +267,7 @@ async def shutdown(interaction: discord.Interaction):
     await bot.close()
 
 @bot.tree.command(name='logout', description='봇 임시 중단')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def logout(interaction: discord.Interaction):
     global delete_enabled, logout_done, restart_done
     if not logout_done:
@@ -275,7 +280,7 @@ async def logout(interaction: discord.Interaction):
         await interaction.response.send_message('이미 로그아웃이 수행되었습니다.')
 
 @bot.tree.command(name='restart', description='봇 재시작')
-@commands.check(is_allowed)  # Check if the invoker is allowed
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def restart(interaction: discord.Interaction):
     global delete_enabled, logout_done, restart_done
     if not restart_done:
@@ -288,6 +293,7 @@ async def restart(interaction: discord.Interaction):
         await interaction.response.send_message('이미 재시작이 수행되었습니다.')
 
 @bot.tree.command(name='help', description='사용 가능한 명령어 및 설명 표시')
+@check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
 async def help(interaction: discord.Interaction):
     """
     봇의 사용 가능한 명령어와 간단한 설명을 표시합니다.
