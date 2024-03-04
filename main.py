@@ -46,19 +46,6 @@ def is_allowed_user(ctx):
 
 # 각 멤버에 대해 첫 번째 오류 메시지가 전송되었는지 여부를 저장하는 딕셔너리
 first_error_message_sent = {}
-<<<<<<< HEAD
-
-async def send_delayed_message(member, content):
-    try:
-        await asyncio.sleep(60 * 60)  # 60분
-        await member.send(content)
-    except discord.errors.Forbidden:
-        print(f"메시지를 보낼 수 없습니다: {member.id}에게 DM을 보낼 수 없음")
-    except Exception as e:
-        print(f"예기치 않은 오류 발생: {e}")
-
-=======
->>>>>>> 30d6a76f9dd5c96a3d817346eab967a092c1b431
 @bot.event
 async def on_ready():
     print(f'{bot.user.name}이(가) 성공적으로 로그인했습니다!')
@@ -158,19 +145,6 @@ async def on_message_edit(before, after):
         # 금지어를 확인하고 처리합니다.
         await check_and_handle_banned_words(after)
 
-<<<<<<< HEAD
-# setup 함수 호출 후에 Slash 명령어 정의
-@slash.slash(name='add_word', description='금지어 목록에 단어 추가', options=[create_option(name='word', description='추가할 단어', option_type=3, required=True)])
-async def add_word(ctx: SlashContext, word: str):
-    if ctx.author.id not in allowed_command_users:
-        await ctx.send("명령어를 실행할 권한이 없습니다.")
-        return
-
-    global banned_words
-    banned_words.add(word.lower())
-    save_data({'banned_words': list(banned_words)})
-    await ctx.send(f'이제 "{word}"은(는) 금지어 목록에 추가되었습니다.')
-=======
 @bot.tree.command(name='add_word', description='금지어 목록에 단어 추가')
 @app_commands.describe(word='금지어')
 @check(is_allowed_user)  # 허가된 사용자만 접근 가능하도록 설정
@@ -179,7 +153,6 @@ async def add_word(interaction: discord.Interaction, word: str):
     banned_words.add(word.lower())
     save_data({'banned_words': list(banned_words)})
     await interaction.response.send_message(f'이제 님들 "{word}"도 못 씀')
->>>>>>> 30d6a76f9dd5c96a3d817346eab967a092c1b431
 
 @bot.tree.command(name='remove_word', description='금지어 목록에서 단어 제거')
 @app_commands.describe(word='금지어')
