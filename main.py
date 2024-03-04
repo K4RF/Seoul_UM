@@ -47,11 +47,13 @@ def find_role(guild, role_name):
 first_error_message_sent = {}
 
 async def send_delayed_message(member, content):
-    await asyncio.sleep(60 * 60)  # 60분
     try:
+        await asyncio.sleep(60 * 60)  # 60분
         await member.send(content)
     except discord.errors.Forbidden:
-        pass  # DM이 차단되어 있는 경우 무시
+        print(f"메시지를 보낼 수 없습니다: {member.id}에게 DM을 보낼 수 없음")
+    except Exception as e:
+        print(f"예기치 않은 오류 발생: {e}")
 
 @bot.event
 async def on_ready():
@@ -147,10 +149,14 @@ async def on_message_edit(before, after):
 # setup 함수 호출 후에 Slash 명령어 정의
 @slash.slash(name='add_word', description='금지어 목록에 단어 추가', options=[create_option(name='word', description='추가할 단어', option_type=3, required=True)])
 async def add_word(ctx: SlashContext, word: str):
+    if ctx.author.id not in allowed_command_users:
+        await ctx.send("명령어를 실행할 권한이 없습니다.")
+        return
+
     global banned_words
     banned_words.add(word.lower())
     save_data({'banned_words': list(banned_words)})
-    await ctx.send(f'이제 님들 "{word}"도 못 씀')
+    await ctx.send(f'이제 "{word}"은(는) 금지어 목록에 추가되었습니다.')
 
 @slash.slash(name='remove_word', description='금지어 목록에서 단어 제거', options=[create_option(name='word', description='제거할 단어', option_type=3, required=True)])
 async def remove_word(ctx: SlashContext, word: str):
